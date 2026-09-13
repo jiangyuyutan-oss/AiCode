@@ -52,4 +52,10 @@ interface SlashCommandContext {
 
     /** 打开当前会话的回退（检查点）选择菜单。 */
     fun requestRewindMenu()
+
+    /**
+     * 导出当前生效 provider 配置到容器内 ~/.aicode/opencode-provider.json，
+     * 并把 setup-opencode 技能正文作为请求发给 AI 执行（检测/安装 opencode CLI + 生成配置）。
+     */
+    fun runSetupOpencode()
 }

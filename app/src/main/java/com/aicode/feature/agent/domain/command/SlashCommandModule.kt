@@ -47,4 +47,8 @@ abstract class SlashCommandModule {
     @Binds
     @IntoSet
     abstract fun bindRewindCommandHandler(handler: RewindCommandHandler): SlashCommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindSetupOpencodeCommandHandler(handler: SetupOpencodeCommandHandler): SlashCommandHandler
 }

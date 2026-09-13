@@ -953,6 +953,18 @@ class AIAgentViewModel @Inject constructor(
         const val TAG = "AIAgentViewModel"
         const val AGENT_COMPLETE_CHANNEL = "agent_complete"
         const val AGENT_COMPLETE_NOTIFICATION_ID = 100
+
+        /** /setup-opencode：App 导出到容器 ~/.aicode/ 的 provider 配置文件名。 */
+        const val SETUP_OPENCODE_PROVIDER_EXPORT = "opencode-provider.json"
+
+        /** /setup-opencode：发给 AI 的任务提示词（正文与内置技能 setup-opencode 一致）。 */
+        val SETUP_OPENCODE_PROMPT = """
+            请加载技能 setup-opencode 并按其正文完成 OpenCode CLI 的安装配置：
+            1. 检测容器（Bentley）内 opencode 是否可用（opencode --version），无则用官方脚本或 npm 安装。
+            2. 读取 App 已导出的 ~/.aicode/opencode-provider.json（当前生效 provider 的 baseUrl/apiKey/model）。
+            3. 按其 providerType 选 npm 适配包，生成或合并 ~/.config/opencode/opencode.json 配置（provider id 用 aicode，model 用 aicode/<模型id>）。
+            4. 用 opencode run 验证可用，报告结果。全程不要把 apiKey 的值打印到对话里。
+        """.trimIndent()
         /** 消息全文搜索单次返回上限。 */
         const val MESSAGE_SEARCH_LIMIT = 50
         /** 跳转定位允许扩到的消息加载上限。 */
@@ -2064,6 +2076,56 @@ class AIAgentViewModel @Inject constructor(
         sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
         messagePersistenceUseCase.persist(sessionId, MessageRole.ASSISTANT, content, isCompacted = true)
     }
+
+    // ── 斜杠指令 /setup-opencode ────────────────────────────────────
+
+    /** /setup-opencode —— 导出当前 provider 配置并把安装配置任务交给 AI 执行。 */
+    override fun runSetupOpencode() {
+        val sessionId = _currentSessionId.value ?: return
+        viewModelScope.launch {
+            // 1. 定位当前生效 provider：会话绑定优先，回退全局默认
+            val session = sessionUseCase.getSessionById(sessionId)
+            val providerId = session?.providerId?.takeIf { it.isNotBlank() }
+                ?: defaultModelSettingsRepository.getDefaultProviderId().takeIf { it.isNotBlank() }
+            val provider = providerId?.let { aiProviderRepository.getProviderById(it) }
+            if (provider == null) {
+                persistInfoBubble(sessionId, context.getString(R.string.command_setup_opencode_no_provider))
+                return@launch
+            }
+            // 2. 导出到容器内 ~/.aicode/opencode-provider.json（filesDir/aicode/）
+            val exportFile = java.io.File(
+                java.io.File(context.filesDir, "aicode"),
+                SETUP_OPENCODE_PROVIDER_EXPORT
+            )
+            exportFile.parentFile?.mkdirs()
+            val exported = """
+                {
+                  "providerName": ${jsonQuote(provider.name)},
+                  "providerType": "${provider.type.name}",
+                  "baseUrl": ${jsonQuote(provider.baseUrl)},
+                  "apiKey": ${jsonQuote(provider.apiKey)},
+                  "model": ${jsonQuote(provider.effectiveModel)}
+                }
+            """.trimIndent()
+            runCatching { exportFile.writeText(exported) }
+                .onFailure {
+                    FileLogger.e(TAG, "导出 provider 配置失败", it)
+                    persistInfoBubble(sessionId, context.getString(R.string.command_setup_opencode_export_failed))
+                    return@launch
+                }
+            // 3. 把技能任务正文发给 AI 执行（提示词引导其检测安装 opencode 并按导出文件生成配置）
+            executeAgentRequestStream(
+                request = SETUP_OPENCODE_PROMPT,
+                modelRequest = SETUP_OPENCODE_PROMPT,
+                targetSessionId = sessionId,
+                skipTitleUpdate = true
+            )
+        }
+    }
+
+    /** JSON 字符串字面量转义。 */
+    private fun jsonQuote(text: String): String =
+        "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
 
 
 
