@@ -111,6 +111,28 @@ class ContainerInstaller @Inject constructor(
         }
 
         /**
+         * 从 assets 提取内置技能（如 github-reference）到 ~/.aicode/skills/<name>/SKILL.md。
+         * 逐目录处理：技能目录已存在则不覆盖（保留用户在设置页的修改与删除后的重建选择），
+         * 用户自建的其它技能目录完全不受影响。禁用状态由 SkillConfigRepository 持久化，
+         * 用户禁用内置技能后文件保留、清单中不再出现。
+         */
+        fun extractSkills(context: Context) {
+            val destDir = File(File(context.filesDir, "aicode"), "skills")
+            destDir.mkdirs()
+            runCatching {
+                val entries = context.assets.list("skills") ?: return@runCatching
+                for (entry in entries) {
+                    val destSkillDir = File(destDir, entry)
+                    if (!destSkillDir.isDirectory) {
+                        extractAssetsRecursive(context, "skills/$entry", destSkillDir)
+                    }
+                }
+            }.onFailure {
+                FileLogger.w(TAG, "提取内置技能失败: ${it.message}", it)
+            }
+        }
+
+        /**
          * 从 assets 提取内置脚本（如套餐余量 demo_balance.py）到 ~/.aicode/scripts/。
          * 若文件已存在则不覆盖，以保留用户的修改。
          */

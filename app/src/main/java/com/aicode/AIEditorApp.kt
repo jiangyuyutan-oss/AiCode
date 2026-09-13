@@ -180,6 +180,10 @@ class AIEditorApp : Application(), Configuration.Provider {
         appScope.launch {
             ContainerInstaller.extractAgents(this@AIEditorApp)
         }
+        // 启动即释放内置技能（github-reference 开源参考）到 ~/.aicode/skills/；已存在不覆盖，同子代理惯例。
+        appScope.launch {
+            ContainerInstaller.extractSkills(this@AIEditorApp)
+        }
         // 启动即把旧 Room git 凭据一次性迁移到 git-credentials 文件（真源已迁到文件，删表由迁移器完成）。
         appScope.launch {
             legacyCredentialMigrator.migrateIfNeeded()
