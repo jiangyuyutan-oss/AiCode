@@ -14,6 +14,7 @@ import com.aicode.core.util.FileLogger
 import net.schmizz.sshj.common.SecurityUtils
 import com.aicode.feature.agent.domain.container.ContainerInstaller
 import com.aicode.feature.agent.domain.mcp.McpManager
+import com.aicode.feature.agent.domain.notification.AgentInteractionNotificationManager
 import com.aicode.feature.settings.data.repository.KeepaliveSettingsRepository
 import com.aicode.feature.settings.data.repository.LanguageSettingsRepository
 import com.aicode.feature.settings.data.repository.LogSettingsRepository
@@ -92,6 +93,10 @@ class AIEditorApp : Application(), Configuration.Provider {
     @Inject
     lateinit var mcpManager: McpManager
 
+    /** 交互通知管理：启动即清理上次进程残留的权限/计划快捷操作通知（按钮已无 resolver 可路由）。 */
+    @Inject
+    lateinit var interactionNotificationManager: AgentInteractionNotificationManager
+
     /** MCP 配置仓库：启动即监听 mcp.json 外部直接编辑，改动数秒内刷新列表并触发重连。 */
     @Inject
     lateinit var mcpConfigRepository: com.aicode.feature.agent.domain.mcp.McpConfigRepository
@@ -160,6 +165,9 @@ class AIEditorApp : Application(), Configuration.Provider {
             registerBouncyCastle()
         }
         createNotificationChannels()
+        // 上次进程被杀后可能残留带快捷按钮的交互通知，点击已无 resolver 可路由：启动即清理。
+        interactionNotificationManager.cancelPermission()
+        interactionNotificationManager.cancelPlan()
         // 主线程启动凭据请求监听（FileObserver 必须主线程创建与 startWatching），
         // 监听容器内 credential helper 写来的 cred-req-* → 全局弹窗回填 → 回喂 git 续跑。
         credentialRequestBridge.start()
