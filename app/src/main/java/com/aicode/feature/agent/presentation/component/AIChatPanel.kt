@@ -311,6 +311,8 @@ fun AIChatPanel(
     val currentGoal by viewModel.currentSessionGoal.collectAsStateWithLifecycle()
     val goalStepCount by viewModel.currentGoalStepCount.collectAsStateWithLifecycle()
     val goalFailCount by viewModel.currentGoalFailCount.collectAsStateWithLifecycle()
+    val actionSuggestions by viewModel.actionSuggestions.collectAsStateWithLifecycle()
+    val optimizingInput by viewModel.optimizingInput.collectAsStateWithLifecycle()
 
     var inputText by remember { mutableStateOf("") }
     val inputDraft by viewModel.inputDraft.collectAsStateWithLifecycle()
@@ -1125,6 +1127,21 @@ fun AIChatPanel(
                 }
             }
 
+            // 行动建议条：每轮对话结束后展示，点击将建议文本填入输入框；流式进行中隐藏
+            AnimatedVisibility(
+                visible = actionSuggestions.isNotEmpty() && !isBusy,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                ActionSuggestionsRow(
+                    suggestions = actionSuggestions,
+                    onSelected = { suggestion ->
+                        inputText = suggestion
+                        viewModel.updateInputDraft(suggestion)
+                    }
+                )
+            }
+
             ChatInputBar(
                 value = inputText,
                 onValueChange = { inputText = it; viewModel.updateInputDraft(it) },
@@ -1143,6 +1160,8 @@ fun AIChatPanel(
                 currentMode = currentMode,
                 onToggleMode = { viewModel.setSessionMode(it) },
                 targetGoalPending = currentMode == AgentMode.TARGET && currentGoal == null,
+                optimizingInput = optimizingInput,
+                onOptimizeInput = { viewModel.optimizeInputExpression() },
                 reasoningEffort = reasoningEffort,
                 onReasoningEffortChange = { viewModel.setSessionReasoningEffort(it) },
                 pendingAttachments = pendingAttachments,

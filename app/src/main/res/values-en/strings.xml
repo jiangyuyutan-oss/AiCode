@@ -313,6 +313,7 @@
     <string name="chat_new_session_btn">New Chat</string>
     <string name="chat_open_sidebar">Open sidebar</string>
     <string name="chat_add_attachment">Add attachment</string>
+    <string name="chat_optimize_input">Optimize expression</string>
     <string name="chat_take_photo">Take photo</string>
     <string name="chat_reasoning_effort">Reasoning effort</string>
     <string name="chat_reasoning_effort_none">None</string>

@@ -222,6 +222,56 @@ class AIAgentViewModel @Inject constructor(
         draftPrefs.edit().remove(id).apply()
     }
 
+    /**
+     * 输入框「优化表达」：把当前输入文本经当前对话模型结合对话上下文优化后回填输入框。
+     * 优化失败时保留原文，不打断输入。
+     */
+    fun optimizeInputExpression() {
+        val sid = _currentSessionId.value ?: return
+        val draft = _inputDrafts.value[sid]?.trim().orEmpty()
+        if (draft.isBlank() || _optimizingInput.value) return
+        viewModelScope.launch {
+            _optimizingInput.value = true
+            try {
+                val context = recentContextForSideCall(sid)
+                val optimized = agentWorkflow.optimizeRequest(sid, draft, context) ?: return@launch
+                updateInputDraft(optimized)
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "优化输入表达失败", e)
+            } finally {
+                _optimizingInput.value = false
+            }
+        }
+    }
+
+    /**
+     * 旁路 LLM 调用用的近期对话上下文：取最近几条消息，按类型截断正文并剥离
+     * thinking/签名/工具调用等主循环专用字段，控制 token 成本。
+     */
+    private suspend fun recentContextForSideCall(
+        sid: String,
+        maxMessages: Int = 6,
+        maxCharsPerMessage: Int = 300
+    ): List<AgentMessage> = messagePersistenceUseCase.buildHistory(sid, SessionUseCase.PENDING_TOOL_MARKER)
+        .takeLast(maxMessages)
+        .map { message ->
+            when (message) {
+                is AgentMessage.UserMessage -> message.copy(content = message.content.take(maxCharsPerMessage))
+                is AgentMessage.AssistantMessage -> message.copy(
+                    content = message.content.take(maxCharsPerMessage),
+                    toolCalls = emptyList(),
+                    reasoning = "",
+                    signature = "",
+                    thinkingBlocksJson = "",
+                    images = emptyList()
+                )
+                is AgentMessage.ToolResultMessage -> message.copy(
+                    result = message.result.take(maxCharsPerMessage),
+                    images = emptyList()
+                )
+            }
+        }
+
     fun loadMoreMessages() {
         val sid = _currentSessionId.value ?: return
         val currentLimit = _messageLimit.value[sid] ?: defaultLimit
@@ -534,6 +584,18 @@ class AIAgentViewModel @Inject constructor(
     val currentGoalTerminationReason: StateFlow<String?> =
         currentSessionState.map { it?.goalTerminationReason }
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** 当前会话的行动建议（每轮对话结束后生成，至多 3 条，点击填入输入框）。 */
+    private val _actionSuggestions = MutableStateFlow<Map<String, List<String>>>(emptyMap())
+    val actionSuggestions: StateFlow<List<String>> = _currentSessionId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList()) else _actionSuggestions.map { it[id].orEmpty() }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** 输入框「优化表达」是否执行中（按钮显示进度、防重复点击）。 */
+    private val _optimizingInput = MutableStateFlow(false)
+    val optimizingInput: StateFlow<Boolean> = _optimizingInput.asStateFlow()
 
     /** 当前会话的思考强度（默认 MEDIUM）。 */
     val currentSessionReasoningEffort: StateFlow<ReasoningEffort> =
@@ -1116,6 +1178,8 @@ class AIAgentViewModel @Inject constructor(
         }
 
         coroutineContext[Job]?.let { sessionJobs[sessionId] = it }
+        // 新一轮请求开始：清掉上一轮的行动建议（已过时）
+        _actionSuggestions.value = _actionSuggestions.value - sessionId
         FileLogger.d(TAG, "stream start: sid=$sessionId prevState=${_agentStates.value[sessionId]} isAutoTrigger=$isAutoTrigger")
         setAgentState(sessionId, AgentUIState.Streaming)
         acquireKeepalive()
@@ -1346,6 +1410,23 @@ class AIAgentViewModel @Inject constructor(
                 setAgentState(sessionId, AgentUIState.Result(WorkflowStatus.SUCCESS))
             }
             setStreamingText(sessionId, null)
+
+            // 对话结束（无排队后续、非失败、非子会话）时异步生成 3 个行动建议，供下一步快速发起
+            if (!failed && !isSub && _queuedRequests.value[sessionId].isNullOrEmpty()) {
+                viewModelScope.launch {
+                    try {
+                        val history = recentContextForSideCall(sessionId)
+                        val suggestions = agentWorkflow.generateActionSuggestions(sessionId, history)
+                        if (suggestions.isNotEmpty()) {
+                            _actionSuggestions.value = _actionSuggestions.value + (sessionId to suggestions)
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        FileLogger.w(TAG, "生成行动建议失败", e)
+                    }
+                }
+            }
 
         } catch (e: CancellationException) {
             val cancelledState = _agentStates.value[sessionId]

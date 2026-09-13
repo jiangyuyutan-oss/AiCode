@@ -1,6 +1,7 @@
 package com.aicode.feature.agent.domain.workflow
 
 import com.aicode.feature.agent.domain.model.AgentContext
+import com.aicode.feature.agent.domain.model.AgentMessage
 import com.aicode.feature.agent.domain.model.AgentMode
 import com.aicode.feature.agent.domain.provider.RetryErrorInfo
 import com.aicode.feature.agent.domain.tool.AgentTool
@@ -108,4 +109,16 @@ interface AgentWorkflow {
      * 优化失败或取不到结果时返回 null（调用方回退使用用户原文）。
      */
     suspend fun generateGoalStatement(sessionId: String, request: String): String?
+
+    /**
+     * 结合对话上下文优化用户当前输入的需求表达（跟随当前聊天模型，输入框「优化表达」按钮）。
+     * 优化失败或取不到结果时返回 null（调用方保留原文）。
+     */
+    suspend fun optimizeRequest(sessionId: String, request: String, context: List<AgentMessage>): String?
+
+    /**
+     * 每轮对话结束后基于上下文生成至多 3 个后续行动建议（跟随当前聊天模型）。
+     * 生成失败或取不到结果时返回空列表。
+     */
+    suspend fun generateActionSuggestions(sessionId: String, history: List<AgentMessage>): List<String>
 }

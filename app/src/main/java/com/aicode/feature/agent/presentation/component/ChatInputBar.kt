@@ -30,6 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -114,6 +117,8 @@ internal fun ChatInputBar(
     currentMode: AgentMode,
     onToggleMode: (AgentMode) -> Unit,
     targetGoalPending: Boolean = false,
+    optimizingInput: Boolean = false,
+    onOptimizeInput: () -> Unit = {},
     reasoningEffort: ReasoningEffort,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
     pendingAttachments: List<PendingUploadAttachment>,
@@ -397,6 +402,24 @@ internal fun ChatInputBar(
                         contentDescription = stringResource(R.string.chat_add_attachment),
                         onClick = { showAttachmentSheet = true }
                     )
+                    IconButton(
+                        enabled = !isBusy && value.isNotBlank() && !optimizingInput,
+                        onClick = onOptimizeInput
+                    ) {
+                        if (optimizingInput) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = stringResource(R.string.chat_optimize_input),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     SendButton(canSend = canSend, hasContent = hasContent, isBusy = isBusy, tokenProgress = tokenProgress, onSend = onSend, onStop = onStop)
                 }
             }

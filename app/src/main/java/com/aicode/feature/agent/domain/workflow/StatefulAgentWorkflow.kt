@@ -112,8 +112,11 @@ class StatefulAgentWorkflow @Inject constructor(
         const val USER_REJECTED_CODE = "USER_REJECTED"
         const val TITLE_GENERATOR_FILE = "agent/title-generator.md"
         const val GOAL_OPTIMIZER_FILE = "agent/goal-optimizer.md"
+        const val REQUEST_OPTIMIZER_FILE = "agent/request-optimizer.md"
+        const val ACTION_SUGGESTIONS_FILE = "agent/action-suggestions.md"
         const val TITLE_MAX_CHARS = 50
         const val GOAL_STATEMENT_MAX_CHARS = 600
+        const val REQUEST_MAX_CHARS = 2000
         private const val GOAL_STATEMENT_PLACEHOLDER = "（目标声明待生成：将从用户下一条消息自动提取）"
         /** 模式提醒提示词：复用 prompts 目录文件（用户可自定义覆盖），切换时随消息注入而非进 system。 */
         const val MODE_REMINDER_PLAN_FILE = "80-plan-mode.md"
@@ -1030,6 +1033,92 @@ class StatefulAgentWorkflow @Inject constructor(
     }.onFailure { e ->
         FileLogger.w(TAG, "优化目标声明失败", e)
     }.getOrNull()
+
+    /**
+     * 旁路单轮 LLM 调用（不进主循环、不产生对话气泡）：解析 provider、加载提示词、调用并记录调用日志，
+     * 返回模型原始正文；失败返回 null。generateTitle/generateGoalStatement 与本方法同构，
+     * 仅提示词与后处理不同，故新方法统一走本入口。
+     */
+    private suspend fun sideLlmCall(
+        sessionId: String,
+        kind: String,
+        promptFile: String,
+        messages: List<AgentMessage>
+    ): String? = runCatching {
+        val provider = getEffectiveProvider(sessionId)
+        val prompt = promptProvider.resolvePrompt(promptFile)
+            .replace(LEADING_COMMENT, "")
+        val callStartWall = System.currentTimeMillis()
+        val callStartElapsed = SystemClock.elapsedRealtime()
+        var callCompleted = false
+        var callError: String? = null
+        var usage: AIResponse? = null
+        val response = try {
+            val resp = provider.complete(
+                systemPrompt = prompt,
+                messages = messages,
+                tools = emptyList()
+            )
+            usage = resp
+            callCompleted = true
+            resp
+        } catch (e: CancellationException) {
+            callError = "cancelled"
+            throw e
+        } catch (e: Exception) {
+            callError = e.message ?: e.javaClass.simpleName
+            throw e
+        } finally {
+            val durationMillis = (SystemClock.elapsedRealtime() - callStartElapsed).toInt()
+            runCatching {
+                llmCallRecordDao.insert(
+                    LlmCallRecordEntity(
+                        sessionId = sessionId,
+                        providerId = provider.providerId.ifBlank { null },
+                        model = provider.model,
+                        kind = kind,
+                        inputTokens = usage?.inputTokens ?: 0,
+                        outputTokens = usage?.outputTokens ?: 0,
+                        cachedInputTokens = usage?.cachedInputTokens ?: 0,
+                        cacheCreationTokens = usage?.cacheCreationTokens ?: 0,
+                        ttfbMillis = null,
+                        durationMillis = durationMillis,
+                        status = if (callCompleted) "success" else "error",
+                        errorMessage = callError,
+                        stopReason = usage?.stopReason,
+                        createdAt = callStartWall
+                    )
+                )
+            }
+        }
+        response.content
+    }.onFailure { e ->
+        FileLogger.w(TAG, "旁路 LLM 调用失败: kind=$kind", e)
+    }.getOrNull()
+
+    override suspend fun optimizeRequest(sessionId: String, request: String, context: List<AgentMessage>): String? {
+        val messages = context + AgentMessage.UserMessage(content = request)
+        return sideLlmCall(sessionId, "optimize", REQUEST_OPTIMIZER_FILE, messages)
+            ?.trim()
+            ?.replace("\n", " ")
+            ?.take(REQUEST_MAX_CHARS)
+            ?.ifBlank { null }
+    }
+
+    override suspend fun generateActionSuggestions(sessionId: String, history: List<AgentMessage>): List<String> {
+        val raw = sideLlmCall(sessionId, "suggestions", ACTION_SUGGESTIONS_FILE, history) ?: return emptyList()
+        // 优先按 JSON 数组解析；格式不合规时退化为按行拆分
+        val fromJson = runCatching { Json.parseToJsonElement(raw).jsonArray }
+            .getOrNull()
+            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.take(3)
+        if (!fromJson.isNullOrEmpty()) return fromJson
+        return raw.lines()
+            .map { it.trim().removePrefix("-").removePrefix("*").trim().trim('"') }
+            .filter { it.isNotEmpty() }
+            .take(3)
+    }
 
     private suspend fun runToolStream(
         tool: StreamingAgentTool, 
