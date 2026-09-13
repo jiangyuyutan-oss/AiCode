@@ -96,6 +96,46 @@ class ToolPermissionPolicyEngineTest {
         assertEquals(ToolPermissionPolicyEngine.Verdict.ALLOW, r.verdict)
     }
 
+    // ── TARGET 模式：与 AUTO 同口径放行，灾难性 rm 防护同样保留 ──────
+
+    @Test
+    fun targetMode_allowsAnyTool() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.WRITE_WORKSPACE), "writeFile", emptyMap(), AgentMode.TARGET)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.ALLOW, r.verdict)
+    }
+
+    @Test
+    fun targetMode_allowsBash() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("ls -la"), AgentMode.TARGET)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.ALLOW, r.verdict)
+    }
+
+    @Test
+    fun targetMode_stillBlocksCatastrophicRm() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("rm -rf /"), AgentMode.TARGET)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.DENY, r.verdict)
+        assertEquals("安全防护：禁止执行高危删除操作（根目录删除）", r.denyReason)
+    }
+
+    @Test
+    fun targetMode_stillBlocksWorkspaceRm() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("rm -rf ~/workspace/*"), AgentMode.TARGET)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.DENY, r.verdict)
+    }
+
+    @Test
+    fun targetMode_catastrophicRmDeniedEvenWithAllowRule() = runTest {
+        val e = engine(
+            PermissionRule("Bash", "rm -rf", PermissionDecision.ALLOW)
+        )
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("rm -rf /"), AgentMode.TARGET)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.DENY, r.verdict)
+    }
+
     @Test
     fun autoMode_stillBlocksCatastrophicRm() = runTest {
         val e = engine()
