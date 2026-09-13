@@ -294,6 +294,7 @@ fun AIChatPanel(
     val pendingQuestion by viewModel.pendingUserQuestion.collectAsStateWithLifecycle()
     val queuedRequests by viewModel.queuedRequests.collectAsStateWithLifecycle()
     val targetRewindMessageId by viewModel.targetRewindMessageId.collectAsStateWithLifecycle()
+    val modelSheetRequested by viewModel.modelSheetRequested.collectAsStateWithLifecycle()
     val providers = (settingsViewModel?.providers?.collectAsStateWithLifecycle()?.value ?: emptyList()).filter { it.isEnabled }
     val modelMetadata = settingsViewModel?.modelMetadata?.collectAsStateWithLifecycle()?.value.orEmpty()
     val sessionProviderModel by viewModel.currentSessionProviderModel.collectAsStateWithLifecycle()
@@ -1233,8 +1234,11 @@ fun AIChatPanel(
                     } else 0f
                 },
                 isScrolling = listState.isScrollInProgress,
-                forceOpenModelSheet = onboardingStep == OnboardingStep.SIMULATE_CHOOSE_MODEL,
-                onModelSheetDismiss = onSelectModelInOnboarding,
+                forceOpenModelSheet = onboardingStep == OnboardingStep.SIMULATE_CHOOSE_MODEL || modelSheetRequested,
+                onModelSheetDismiss = {
+                    onSelectModelInOnboarding?.invoke()
+                    viewModel.onModelSheetDismissed()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onboardingTarget(OnboardingStep.SEND_MESSAGE)

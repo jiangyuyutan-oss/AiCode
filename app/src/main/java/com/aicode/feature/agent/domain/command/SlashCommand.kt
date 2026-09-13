@@ -34,4 +34,22 @@ interface SlashCommandHandler {
 interface SlashCommandContext {
     fun showSessionStatus()
     fun compactCurrentSession()
+
+    /** 打开模型选择弹窗（等同点输入栏的模型按钮）。 */
+    fun requestModelSheet()
+
+    /** 以 Markdown 气泡列出当前会话生效的项目规则（prompts 分层注入内容）。 */
+    fun showMemoryOverview()
+
+    /** 以 Markdown 气泡列出已安装技能（名称/描述/启用状态）与内置子代理。 */
+    fun showSkillsOverview()
+
+    /** 以 Markdown 气泡列出 MCP 服务器连接状态与工具数。 */
+    fun showMcpOverview()
+
+    /** 以 Markdown 气泡列出当前注册可用的工具。 */
+    fun showToolsOverview()
+
+    /** 打开当前会话的回退（检查点）选择菜单。 */
+    fun requestRewindMenu()
 }

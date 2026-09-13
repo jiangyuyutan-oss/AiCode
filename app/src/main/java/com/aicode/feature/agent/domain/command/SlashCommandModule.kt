@@ -23,4 +23,28 @@ abstract class SlashCommandModule {
     @Binds
     @IntoSet
     abstract fun bindCompressCommandHandler(handler: CompressCommandHandler): SlashCommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindModelCommandHandler(handler: ModelCommandHandler): SlashCommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindMemoryCommandHandler(handler: MemoryCommandHandler): SlashCommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindSkillsCommandHandler(handler: SkillsCommandHandler): SlashCommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindMcpCommandHandler(handler: McpCommandHandler): SlashCommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindToolsCommandHandler(handler: ToolsCommandHandler): SlashCommandHandler
+
+    @Binds
+    @IntoSet
+    abstract fun bindRewindCommandHandler(handler: RewindCommandHandler): SlashCommandHandler
 }

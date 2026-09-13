@@ -41,6 +41,7 @@ import com.aicode.feature.agent.domain.notification.NotificationOutcome
 import com.aicode.feature.agent.domain.notification.PendingNotification
 import com.aicode.feature.agent.domain.permission.PermissionChoice
 import com.aicode.feature.agent.domain.mcp.McpManager
+import com.aicode.feature.agent.domain.mcp.McpServerStatus
 import com.aicode.feature.agent.domain.subagent.AgentDefinition
 import com.aicode.feature.agent.domain.subagent.AgentDefinitionRepository
 import com.aicode.feature.agent.domain.subagent.SubAgentEvent
@@ -58,6 +59,7 @@ import com.aicode.feature.workspace.domain.WorkspacePathMapper
 import com.aicode.feature.workspace.domain.isValidFileEntryName
 import com.aicode.feature.agent.domain.workflow.AgentEvent
 import com.aicode.feature.agent.domain.tool.ToolPermissionManager
+import com.aicode.feature.agent.domain.tool.ToolPermissionPolicy
 import com.aicode.feature.agent.domain.tool.ToolRegistry
 import com.aicode.feature.agent.domain.tool.mode.PlanApprovalChoice
 import com.aicode.feature.agent.domain.tool.mode.PlanApprovalManager
@@ -142,6 +144,8 @@ class AIAgentViewModel @Inject constructor(
     private val agentNotificationCenter: AgentNotificationCenter,
     private val interactionNotificationManager: AgentInteractionNotificationManager,
     private val agentDefinitionRepository: AgentDefinitionRepository,
+    private val skillRepository: com.aicode.feature.agent.domain.skill.SkillRepository,
+    private val memoryRepository: com.aicode.feature.agent.domain.memory.MemoryRepository,
     val fileAccess: FileAccessProvider,
     private val dirWatcher: WorkspaceDirWatcher,
     @param:ApplicationContext private val context: Context
@@ -1913,6 +1917,154 @@ class AIAgentViewModel @Inject constructor(
     }
 
     private fun escapeMd(text: String): String = text.replace("|", "\\|").replace("\n", " ")
+
+    // ── 斜杠指令 /model ─────────────────────────────────────────────
+
+    /** 请求打开模型选择弹窗（/model），UI 消费后调 [onModelSheetDismissed] 复位。 */
+    private val _modelSheetRequested = MutableStateFlow(false)
+    val modelSheetRequested: StateFlow<Boolean> = _modelSheetRequested.asStateFlow()
+
+    override fun requestModelSheet() {
+        _modelSheetRequested.value = true
+    }
+
+    fun onModelSheetDismissed() {
+        _modelSheetRequested.value = false
+    }
+
+    // ── 斜杠指令 /memory ────────────────────────────────────────────
+
+    /** /memory —— 以 Markdown 表格气泡列出当前会话注入的规则与记忆构成。 */
+    override fun showMemoryOverview() {
+        val sid = _currentSessionId.value ?: return
+        val projectRoot = _currentWorkspace.value
+        viewModelScope.launch(Dispatchers.IO) {
+            val table = buildString {
+                appendLine("| 组成部分 | 内容 |")
+                appendLine("|---|---|")
+                appendLine("| 基础规则 | 内置提示词 00-90（身份/沟通/编码/安全/工具/技能/模式），随 App 升级更新 |")
+                // 项目规则文件：AGENTS.md 优先于 CLAUDE.md（与 SystemPromptProvider 一致）
+                val agentsFile = java.io.File(projectRoot, "AGENTS.md")
+                val claudeFile = java.io.File(projectRoot, "CLAUDE.md")
+                val ruleFile = when {
+                    agentsFile.isFile -> "AGENTS.md"
+                    claudeFile.isFile -> "CLAUDE.md"
+                    else -> null
+                }
+                appendLine("| 项目规则 | ${escapeMd(ruleFile ?: "（未找到 AGENTS.md / CLAUDE.md）")} |")
+                // 记忆
+                val memories = runCatching { memoryRepository.listMemories(projectRoot.ifBlank { null }) }
+                    .getOrDefault(emptyList())
+                val globalCount = memories.count { it.scope == com.aicode.feature.agent.domain.memory.MemoryScope.GLOBAL }
+                val projectCount = memories.count { it.scope == com.aicode.feature.agent.domain.memory.MemoryScope.PROJECT }
+                appendLine("| 全局记忆 | ${if (globalCount == 0) "无" else "$globalCount 条（memory 工具可读全文）"} |")
+                appendLine("| 项目记忆 | ${if (projectCount == 0) "无" else "$projectCount 条（memory 工具可读全文）"} |")
+            }
+            persistInfoBubble(sid, table.trimEnd())
+        }
+    }
+
+    // ── 斜杠指令 /skills ────────────────────────────────────────────
+
+    /** /skills —— 以 Markdown 表格气泡列出技能与内置子代理及启用状态。 */
+    override fun showSkillsOverview() {
+        val sid = _currentSessionId.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val table = buildString {
+                appendLine("| 名称 | 作用域 | 状态 | 描述 |")
+                appendLine("|---|---|---|---|")
+                val entries = runCatching { skillRepository.listAllSkills() }.getOrDefault(emptyList())
+                val disabledNames = entries
+                    .filter { skillRepository.isSkillDisabled(it.skill.name) }
+                    .map { it.skill.name }
+                    .toSet()
+                entries.forEach { entry ->
+                    val status = if (entry.skill.name in disabledNames) "已禁用" else "已启用"
+                    appendLine("| ${escapeMd(entry.skill.name)} | ${entry.scope.name} | $status | ${escapeMd(entry.skill.description)} |")
+                }
+                if (entries.isEmpty()) appendLine("| （无已安装技能，可在设置页新建） | - | - | - |")
+                // 内置子代理
+                val agents = runCatching { agentDefinitionRepository.listEnabled() }.getOrDefault(emptyList())
+                agents.forEach { entry ->
+                    appendLine("| ${escapeMd(entry.definition.name)}（子代理） | - | 已启用 | ${escapeMd(entry.definition.description)} |")
+                }
+                appendLine("| Explore（子代理） | 内置 | 已启用 | 快速探索代码库定位文件与内容 |")
+            }
+            persistInfoBubble(sid, table.trimEnd())
+        }
+    }
+
+    // ── 斜杠指令 /mcp ───────────────────────────────────────────────
+
+    /** /mcp —— 以 Markdown 表格气泡列出 MCP 服务器连接状态。 */
+    override fun showMcpOverview() {
+        val sid = _currentSessionId.value ?: return
+        val table = buildString {
+            appendLine("| MCP 服务器 | 状态 | 工具数 | 说明 |")
+            appendLine("|---|---|---|---|")
+            val statuses = mcpManager.statuses.value
+            if (statuses.isEmpty()) {
+                appendLine("| （未配置 MCP 服务器，可在设置页添加） | - | - | - |")
+            } else {
+                statuses.forEach { s ->
+                    val stateText = when (s.state) {
+                        McpServerStatus.State.CONNECTED -> "已连接"
+                        McpServerStatus.State.CONNECTING -> "连接中"
+                        McpServerStatus.State.FAILED -> "失败"
+                        McpServerStatus.State.DISABLED -> "已禁用"
+                    }
+                    appendLine("| ${escapeMd(s.name)} | $stateText | ${s.toolCount} | ${escapeMd(s.error ?: "")} |")
+                }
+            }
+        }
+        viewModelScope.launch {
+            persistInfoBubble(sid, table.trimEnd())
+        }
+    }
+
+    // ── 斜杠指令 /tools ────────────────────────────────────────────
+
+    /** /tools —— 以 Markdown 表格气泡列出当前注册可用的工具及权限策略。 */
+    override fun showToolsOverview() {
+        val sid = _currentSessionId.value ?: return
+        val table = buildString {
+            appendLine("| 工具 | 权限策略 | 说明 |")
+            appendLine("|---|---|---|")
+            val tools = toolRegistry.getAvailableTools()
+            tools.sortedBy { it.name.lowercase() }.forEach { tool ->
+                val policy = when (tool.permissionPolicy) {
+                    ToolPermissionPolicy.AUTO_APPROVE -> "自动放行"
+                    ToolPermissionPolicy.ASK -> "每次询问"
+                }
+                appendLine("| ${escapeMd(tool.name)} | $policy | ${escapeMd(tool.description.take(60))} |")
+            }
+        }
+        viewModelScope.launch {
+            persistInfoBubble(sid, table.trimEnd())
+        }
+    }
+
+    // ── 斜杠指令 /rewind ───────────────────────────────────────────
+
+    /** /rewind —— 打开回退菜单，定位到最近一条用户消息。 */
+    override fun requestRewindMenu() {
+        val sid = _currentSessionId.value ?: return
+        val lastUserMessage = messagesState.value.messages.lastOrNull { it.role == MessageRole.USER }
+        if (lastUserMessage == null) {
+            viewModelScope.launch {
+                persistInfoBubble(sid, context.getString(R.string.command_rewind_no_target))
+            }
+            return
+        }
+        openRewindMenu(lastUserMessage.id)
+    }
+
+    /** 落库一条以 AI 气泡展示的 Markdown 信息（各 overview 指令共用），并刷新会话时间戳。 */
+    private suspend fun persistInfoBubble(sessionId: String, content: String) {
+        sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
+        messagePersistenceUseCase.persist(sessionId, MessageRole.ASSISTANT, content, isCompacted = true)
+    }
+
 
 
     /** 用户批准计划，唤醒 workflow 继续在 BUILD 模式执行。 */
