@@ -1142,7 +1142,7 @@ fun AIChatPanel(
                 },
                 currentMode = currentMode,
                 onToggleMode = { viewModel.setSessionMode(it) },
-                onEnterTarget = { viewModel.setSessionTargetMode(it) },
+                targetGoalPending = currentMode == AgentMode.TARGET && currentGoal == null,
                 reasoningEffort = reasoningEffort,
                 onReasoningEffortChange = { viewModel.setSessionReasoningEffort(it) },
                 pendingAttachments = pendingAttachments,

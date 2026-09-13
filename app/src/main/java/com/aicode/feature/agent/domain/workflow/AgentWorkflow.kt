@@ -102,4 +102,10 @@ interface AgentWorkflow {
      * 生成失败或取不到标题时返回 null（调用方保留临时标题）。
      */
     suspend fun generateTitle(sessionId: String, request: String): String?
+
+    /**
+     * TARGET 模式：把用户第一条消息优化为可执行的目标声明（跟随当前聊天模型）。
+     * 优化失败或取不到结果时返回 null（调用方回退使用用户原文）。
+     */
+    suspend fun generateGoalStatement(sessionId: String, request: String): String?
 }

@@ -158,10 +158,24 @@ class SessionUseCase @Inject constructor(
     }
 
     /** 进入 TARGET 模式：写入目标声明并重置步数/失败计数；从 TARGET 切出时记录中断原因。 */
-    suspend fun updateTargetMode(sessionId: String, goal: String?) {
+    /** 进入 TARGET 模式（目标待定）：清空旧目标与计数，目标由启用后的第一条用户消息自动设定。 */
+    suspend fun enterTargetMode(sessionId: String) {
         val s = chatSessionDao.getById(sessionId) ?: return
-        val enteringTarget = goal != null
-        val updated = if (enteringTarget) {
+        chatSessionDao.upsert(
+            s.copy(
+                mode = "TARGET",
+                goalStatement = null,
+                goalStepCount = 0,
+                goalFailCount = 0,
+                goalTerminationReason = null
+            )
+        )
+    }
+
+    /** 设定/更新 TARGET 模式的目标声明，并重置步数与失败计数（新一轮目标执行开始）。 */
+    suspend fun updateGoalStatement(sessionId: String, goal: String) {
+        val s = chatSessionDao.getById(sessionId) ?: return
+        chatSessionDao.upsert(
             s.copy(
                 mode = "TARGET",
                 goalStatement = goal,
@@ -169,10 +183,7 @@ class SessionUseCase @Inject constructor(
                 goalFailCount = 0,
                 goalTerminationReason = null
             )
-        } else {
-            s.copy(mode = "BUILD")
-        }
-        chatSessionDao.upsert(updated)
+        )
     }
 
     suspend fun updateProviderModel(sessionId: String, providerId: String?, model: String?) {

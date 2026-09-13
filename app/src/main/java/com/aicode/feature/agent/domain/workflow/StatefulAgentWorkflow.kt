@@ -111,7 +111,10 @@ class StatefulAgentWorkflow @Inject constructor(
         const val PROGRESS_INTERVAL_MS = 250L
         const val USER_REJECTED_CODE = "USER_REJECTED"
         const val TITLE_GENERATOR_FILE = "agent/title-generator.md"
+        const val GOAL_OPTIMIZER_FILE = "agent/goal-optimizer.md"
         const val TITLE_MAX_CHARS = 50
+        const val GOAL_STATEMENT_MAX_CHARS = 600
+        private const val GOAL_STATEMENT_PLACEHOLDER = "（目标声明待生成：将从用户下一条消息自动提取）"
         /** 模式提醒提示词：复用 prompts 目录文件（用户可自定义覆盖），切换时随消息注入而非进 system。 */
         const val MODE_REMINDER_PLAN_FILE = "80-plan-mode.md"
         const val MODE_REMINDER_AUTO_FILE = "81-auto-mode.md"
@@ -439,9 +442,11 @@ class StatefulAgentWorkflow @Inject constructor(
         var state = AgentSessionState()
         var currentTools = tools
 
-        // TARGET 模式：从 DB 恢复当前会话的步数与失败计数（跨用户消息持久）。
+        // TARGET 模式：从 DB 恢复当前会话的步数与失败计数（跨用户消息持久），并取目标声明注入模式提醒。
+        var goalStatement: String? = null
         if (currentContext.mode == AgentMode.TARGET && currentContext.sessionId != null) {
             currentContext = chatSessionDao.getById(currentContext.sessionId)?.let { e ->
+                goalStatement = e.goalStatement
                 currentContext.copy(
                     goalStepCount = e.goalStepCount,
                     goalFailCount = e.goalFailCount,
@@ -451,7 +456,7 @@ class StatefulAgentWorkflow @Inject constructor(
         }
         val actionQueue = ArrayDeque<AgentAction>()
         // 模式提醒随最新用户消息注入（不进 system，避免切换时 system 前缀变化打断缓存）。
-        val modeReminder = buildModeReminder(currentContext.mode)
+        val modeReminder = buildModeReminder(currentContext.mode, goalStatement)
         actionQueue.addLast(
             AgentAction.InitRequest(
                 currentContext.history + AgentMessage.UserMessage(
@@ -751,7 +756,10 @@ class StatefulAgentWorkflow @Inject constructor(
                                     }
                                 } else {
                                     currentContext = newCtx
-                                    rawResult += buildModeSwitchNotice(newCtx.mode)
+                                    val switchedGoal = if (newCtx.mode == AgentMode.TARGET) {
+                                        currentContext.sessionId?.let { chatSessionDao.getById(it)?.goalStatement }
+                                    } else null
+                                    rawResult += buildModeSwitchNotice(newCtx.mode, switchedGoal)
                                 }
                             }
                             batchResults.add(ToolBatchResult(toolCall.id, toolCall.name, rawResult, isError, runResult.attachments, runResult.images))
@@ -971,6 +979,58 @@ class StatefulAgentWorkflow @Inject constructor(
         FileLogger.w(TAG, "生成会话标题失败", e)
     }.getOrNull()
 
+    override suspend fun generateGoalStatement(sessionId: String, request: String): String? = runCatching {
+        val provider = getEffectiveProvider(sessionId)
+        val prompt = promptProvider.resolvePrompt(GOAL_OPTIMIZER_FILE)
+            .replace(LEADING_COMMENT, "")
+        val callStartWall = System.currentTimeMillis()
+        val callStartElapsed = SystemClock.elapsedRealtime()
+        var callCompleted = false
+        var callError: String? = null
+        var usage: AIResponse? = null
+        val response = try {
+            val resp = provider.complete(
+                systemPrompt = prompt,
+                messages = listOf(AgentMessage.UserMessage(content = request)),
+                tools = emptyList()
+            )
+            usage = resp
+            callCompleted = true
+            resp
+        } catch (e: CancellationException) {
+            callError = "cancelled"
+            throw e
+        } catch (e: Exception) {
+            callError = e.message ?: e.javaClass.simpleName
+            throw e
+        } finally {
+            val durationMillis = (SystemClock.elapsedRealtime() - callStartElapsed).toInt()
+            runCatching {
+                llmCallRecordDao.insert(
+                    LlmCallRecordEntity(
+                        sessionId = sessionId,
+                        providerId = provider.providerId.ifBlank { null },
+                        model = provider.model,
+                        kind = "goal",
+                        inputTokens = usage?.inputTokens ?: 0,
+                        outputTokens = usage?.outputTokens ?: 0,
+                        cachedInputTokens = usage?.cachedInputTokens ?: 0,
+                        cacheCreationTokens = usage?.cacheCreationTokens ?: 0,
+                        ttfbMillis = null,
+                        durationMillis = durationMillis,
+                        status = if (callCompleted) "success" else "error",
+                        errorMessage = callError,
+                        stopReason = usage?.stopReason,
+                        createdAt = callStartWall
+                    )
+                )
+            }
+        }
+        response.content.trim().replace("\n", " ").take(GOAL_STATEMENT_MAX_CHARS).ifBlank { null }
+    }.onFailure { e ->
+        FileLogger.w(TAG, "优化目标声明失败", e)
+    }.getOrNull()
+
     private suspend fun runToolStream(
         tool: StreamingAgentTool, 
         toolCall: ToolCall,
@@ -1069,7 +1129,7 @@ class StatefulAgentWorkflow @Inject constructor(
      * 模式提示词不进 system——一旦切换就要重建 system、打断前缀缓存；
      * 改为消息级提醒：每次用户请求拼在最新用户消息末尾，位置在消息流尾部，前缀保持稳定。
      */
-    private fun buildModeReminder(mode: AgentMode): String? = when (mode) {
+    private fun buildModeReminder(mode: AgentMode, goalStatement: String? = null): String? = when (mode) {
         AgentMode.PLAN -> promptProvider.resolvePrompt(MODE_REMINDER_PLAN_FILE)
             .replace(LEADING_COMMENT, "")
             .trim()
@@ -1080,6 +1140,7 @@ class StatefulAgentWorkflow @Inject constructor(
             .let { "【模式提醒】$it" }
         AgentMode.TARGET -> promptProvider.resolvePrompt(MODE_REMINDER_TARGET_FILE)
             .replace(LEADING_COMMENT, "")
+            .replace("{goalStatement}", goalStatement?.takeIf { it.isNotBlank() } ?: GOAL_STATEMENT_PLACEHOLDER)
             .trim()
             .let { "【模式提醒】$it" }
         AgentMode.BUILD -> null
@@ -1097,7 +1158,7 @@ class StatefulAgentWorkflow @Inject constructor(
         return JsonObject(obj + ("notifications" to AgentNotificationFormatter.buildJsonArray(items))).toString()
     }
 
-    private fun buildModeSwitchNotice(mode: AgentMode): String = when (mode) {
+    private fun buildModeSwitchNotice(mode: AgentMode, goalStatement: String? = null): String = when (mode) {
         AgentMode.PLAN -> "\n\n" + promptProvider.resolvePrompt(MODE_REMINDER_PLAN_FILE)
             .replace(LEADING_COMMENT, "")
             .trim()
@@ -1105,6 +1166,7 @@ class StatefulAgentWorkflow @Inject constructor(
         AgentMode.AUTO -> "\n\n【模式切换】你已切换到 AUTO（自动）模式。"
         AgentMode.TARGET -> "\n\n" + promptProvider.resolvePrompt(MODE_REMINDER_TARGET_FILE)
             .replace(LEADING_COMMENT, "")
+            .replace("{goalStatement}", goalStatement?.takeIf { it.isNotBlank() } ?: GOAL_STATEMENT_PLACEHOLDER)
             .trim()
     }
 

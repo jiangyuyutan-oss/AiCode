@@ -1137,6 +1137,13 @@ class AIAgentViewModel @Inject constructor(
                         agentWorkflow.generateTitle(sessionId, request)?.let { sessionUseCase.updateTitle(sessionId, it) }
                     }
                 }
+                // TARGET 模式且尚未设定目标：本条消息自动设为目标，并用当前对话模型优化表达。
+                // 优化失败或写入失败都回退用户原文，保证目标设定不阻塞发送。
+                if (currentSession?.mode == "TARGET" && currentSession?.goalStatement.isNullOrBlank()) {
+                    val goal = agentWorkflow.generateGoalStatement(sessionId, request) ?: request
+                    runCatching { sessionUseCase.updateGoalStatement(sessionId, goal) }
+                        .onFailure { FileLogger.w(TAG, "写入目标声明失败", it) }
+                }
             }
             sessionUseCase.touch(sessionId, messagePersistenceUseCase.nextTimestamp())
 
@@ -1557,15 +1564,12 @@ class AIAgentViewModel @Inject constructor(
     fun setSessionMode(mode: AgentMode) {
         val sid = _currentSessionId.value ?: return
         viewModelScope.launch {
-            sessionUseCase.updateMode(sid, mode.name)
-        }
-    }
-
-    /** 进入 TARGET 模式并设定目标声明；goal 为空时退出 TARGET 回到 BUILD。 */
-    fun setSessionTargetMode(goal: String?) {
-        val sid = _currentSessionId.value ?: return
-        viewModelScope.launch {
-            sessionUseCase.updateTargetMode(sid, goal)
+            // 进入 TARGET 清空旧目标与计数，目标由启用后的第一条用户消息自动设定
+            if (mode == AgentMode.TARGET) {
+                sessionUseCase.enterTargetMode(sid)
+            } else {
+                sessionUseCase.updateMode(sid, mode.name)
+            }
         }
     }
 
