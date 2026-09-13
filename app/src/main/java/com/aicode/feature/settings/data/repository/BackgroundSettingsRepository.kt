@@ -34,6 +34,10 @@ class BackgroundSettingsRepository @Inject constructor(
         const val MIN_ALPHA = 0f
         private val IMAGE_PATH_KEY = stringPreferencesKey("background_image_path")
         private val ALPHA_KEY = floatPreferencesKey("background_alpha")
+        private val FROST_INTENSITY_KEY = floatPreferencesKey("frost_intensity")
+        const val DEFAULT_FROST_INTENSITY = 0.5f
+        const val MIN_FROST_INTENSITY = 0f
+        const val MAX_FROST_INTENSITY = 1f
 
         /** 把 UI 百分比（0~100）线性映射为实际透明度（0~MAX_ALPHA）。 */
         fun sliderToAlpha(percent: Float): Float =
@@ -42,6 +46,12 @@ class BackgroundSettingsRepository @Inject constructor(
         /** 把实际透明度反映射为 UI 百分比（0~100）。 */
         fun alphaToSlider(alpha: Float): Float =
             (alpha / MAX_ALPHA).coerceIn(0f, 1f) * 100f
+
+        fun frostToSlider(intensity: Float): Float =
+            intensity.coerceIn(MIN_FROST_INTENSITY, MAX_FROST_INTENSITY) * 100f
+
+        fun sliderToFrost(percent: Float): Float =
+            (percent / 100f).coerceIn(MIN_FROST_INTENSITY, MAX_FROST_INTENSITY)
     }
 
     /** 当前背景图文件绝对路径；null 表示未设置。 */
@@ -50,6 +60,11 @@ class BackgroundSettingsRepository @Inject constructor(
     /** 背景图不透明度（0.05~0.2，顶层水印保证文字可读）。 */
     val alphaFlow: Flow<Float> = context.backgroundDataStore.data.map {
         (it[ALPHA_KEY] ?: DEFAULT_ALPHA).coerceIn(MIN_ALPHA, MAX_ALPHA)
+    }
+
+    val frostIntensityFlow: Flow<Float> = context.backgroundDataStore.data.map {
+        (it[FROST_INTENSITY_KEY] ?: DEFAULT_FROST_INTENSITY)
+            .coerceIn(MIN_FROST_INTENSITY, MAX_FROST_INTENSITY)
     }
 
     /**
@@ -84,6 +99,13 @@ class BackgroundSettingsRepository @Inject constructor(
     suspend fun setBackgroundAlpha(alpha: Float) {
         context.backgroundDataStore.edit {
             it[ALPHA_KEY] = alpha.coerceIn(MIN_ALPHA, MAX_ALPHA)
+        }
+    }
+
+    suspend fun setFrostIntensity(intensity: Float) {
+        context.backgroundDataStore.edit {
+            it[FROST_INTENSITY_KEY] =
+                intensity.coerceIn(MIN_FROST_INTENSITY, MAX_FROST_INTENSITY)
         }
     }
 

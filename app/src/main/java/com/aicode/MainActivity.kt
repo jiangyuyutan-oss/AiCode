@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
@@ -227,16 +228,13 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // 全局自定义背景图：叠加在所有页面内容之上（水印效果），透明度可调。
-                    // 不拦截触摸事件；弹窗（Dialog 独立窗口）不受层级影响。
+                    // 全局自定义背景图：绘制在页面内容之下，透明度与磨砂强度可调。
                     val bgPath by backgroundSettings.imagePathFlow.collectAsStateWithLifecycle(initialValue = null)
                     val bgAlpha by backgroundSettings.alphaFlow.collectAsStateWithLifecycle(initialValue = BackgroundSettingsRepository.DEFAULT_ALPHA)
+                    val frostIntensity by backgroundSettings.frostIntensityFlow.collectAsStateWithLifecycle(
+                        initialValue = BackgroundSettingsRepository.DEFAULT_FROST_INTENSITY
+                    )
                     Box(modifier = Modifier.fillMaxSize()) {
-                        AppNavigation(onboardingRepository = onboardingRepository)
-                        // 全局凭据弹窗：覆盖所有页面，命令行 git 缺凭据在任意页面都能弹。
-                        com.aicode.feature.credentials.presentation.component.GlobalCredentialDialogHost(
-                            bridge = credentialRequestBridge
-                        )
                         if (bgPath != null && bgAlpha > 0f) {
                             val screen = LocalView.current
                             val bitmap by produceState<ImageBitmap?>(initialValue = null, bgPath) {
@@ -255,10 +253,16 @@ class MainActivity : ComponentActivity() {
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .fillMaxSize()
+                                        .blur((frostIntensity * 32f).dp)
                                         .alpha(bgAlpha)
                                 )
                             }
                         }
+                        AppNavigation(onboardingRepository = onboardingRepository)
+                        // 全局凭据弹窗：覆盖所有页面，命令行 git 缺凭据在任意页面都能弹。
+                        com.aicode.feature.credentials.presentation.component.GlobalCredentialDialogHost(
+                            bridge = credentialRequestBridge
+                        )
                     }
                 }
             }

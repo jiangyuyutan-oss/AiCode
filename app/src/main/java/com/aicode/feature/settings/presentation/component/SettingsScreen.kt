@@ -206,6 +206,7 @@ fun SettingsScreen(
     val dynamicColorEnabled by viewModel.dynamicColorEnabled.collectAsStateWithLifecycle()
     val backgroundImagePath by viewModel.backgroundImagePath.collectAsStateWithLifecycle()
     val backgroundAlpha by viewModel.backgroundAlpha.collectAsStateWithLifecycle()
+    val frostIntensity by viewModel.frostIntensity.collectAsStateWithLifecycle()
     val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
     val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
     val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
@@ -955,8 +956,10 @@ fun SettingsScreen(
         BackgroundImageSheet(
             imagePath = backgroundImagePath,
             alpha = backgroundAlpha,
+            frostIntensity = frostIntensity,
             onPickImage = { viewModel.setBackgroundImage(it) },
             onAlphaChange = { viewModel.setBackgroundAlpha(it) },
+            onFrostIntensityChange = { viewModel.setFrostIntensity(it) },
             onRemove = { viewModel.clearBackgroundImage() },
             onDismiss = { showBackgroundSheet = false }
         )

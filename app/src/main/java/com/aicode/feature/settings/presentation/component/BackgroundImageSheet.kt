@@ -75,8 +75,10 @@ internal fun decodeBackgroundBitmap(path: String, maxWidth: Int, maxHeight: Int)
 internal fun BackgroundImageSheet(
     imagePath: String?,
     alpha: Float,
+    frostIntensity: Float,
     onPickImage: (Uri) -> Unit,
     onAlphaChange: (Float) -> Unit,
+    onFrostIntensityChange: (Float) -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -98,6 +100,9 @@ internal fun BackgroundImageSheet(
     // 滑块位置由本地状态驱动：直接绑外部 alpha 会让每次拖动都走「写 DataStore → 回读 → 整个设置页重组」
     // 的往返，滑块因此跟不上手指。弹窗每次打开都重建，初值取当前设置即可。
     var sliderPercent by remember { mutableFloatStateOf(BackgroundSettingsRepository.alphaToSlider(alpha)) }
+    var frostPercent by remember {
+        mutableFloatStateOf(BackgroundSettingsRepository.frostToSlider(frostIntensity))
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -152,6 +157,32 @@ internal fun BackgroundImageSheet(
                 onValueChange = { percent ->
                     sliderPercent = percent
                     onAlphaChange(BackgroundSettingsRepository.sliderToAlpha(percent))
+                },
+                valueRange = 0f..100f
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_background_frost_intensity),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "${frostPercent.toInt()}%",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Slider(
+                value = frostPercent,
+                onValueChange = { percent ->
+                    frostPercent = percent
+                    onFrostIntensityChange(BackgroundSettingsRepository.sliderToFrost(percent))
                 },
                 valueRange = 0f..100f
             )

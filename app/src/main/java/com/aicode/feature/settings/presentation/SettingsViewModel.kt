@@ -464,8 +464,13 @@ class SettingsViewModel @Inject constructor(
     private val _backgroundAlpha = MutableStateFlow(BackgroundSettingsRepository.DEFAULT_ALPHA)
     val backgroundAlpha: StateFlow<Float> = _backgroundAlpha.asStateFlow()
 
+    private val _frostIntensity =
+        MutableStateFlow(BackgroundSettingsRepository.DEFAULT_FROST_INTENSITY)
+    val frostIntensity: StateFlow<Float> = _frostIntensity.asStateFlow()
+
     /** 透明度落盘的节流 job，见 [setBackgroundAlpha]。 */
     private var backgroundAlphaWriteJob: Job? = null
+    private var frostIntensityWriteJob: Job? = null
 
     /** 用户选择的应用语言 tag（null 表示跟随系统）。 */
     private val _languageTag = MutableStateFlow<String?>(null)
@@ -730,6 +735,12 @@ class SettingsViewModel @Inject constructor(
             launch {
                 backgroundSettingsRepository.alphaFlow.collectLatest {
                     _backgroundAlpha.value = it
+                }
+            }
+
+            launch {
+                backgroundSettingsRepository.frostIntensityFlow.collectLatest {
+                    _frostIntensity.value = it
                 }
             }
 
@@ -1276,10 +1287,28 @@ class SettingsViewModel @Inject constructor(
      * 回读又会把整个设置页带着重组。此处只保留最后一个值，停手约 80ms 后写一次。
      */
     fun setBackgroundAlpha(alpha: Float) {
+        val bounded = alpha.coerceIn(
+            BackgroundSettingsRepository.MIN_ALPHA,
+            BackgroundSettingsRepository.MAX_ALPHA
+        )
+        _backgroundAlpha.value = bounded
         backgroundAlphaWriteJob?.cancel()
         backgroundAlphaWriteJob = viewModelScope.launch {
             delay(BACKGROUND_ALPHA_WRITE_DEBOUNCE_MS)
-            backgroundSettingsRepository.setBackgroundAlpha(alpha)
+            backgroundSettingsRepository.setBackgroundAlpha(bounded)
+        }
+    }
+
+    fun setFrostIntensity(intensity: Float) {
+        val bounded = intensity.coerceIn(
+            BackgroundSettingsRepository.MIN_FROST_INTENSITY,
+            BackgroundSettingsRepository.MAX_FROST_INTENSITY
+        )
+        _frostIntensity.value = bounded
+        frostIntensityWriteJob?.cancel()
+        frostIntensityWriteJob = viewModelScope.launch {
+            delay(BACKGROUND_ALPHA_WRITE_DEBOUNCE_MS)
+            backgroundSettingsRepository.setFrostIntensity(bounded)
         }
     }
 
