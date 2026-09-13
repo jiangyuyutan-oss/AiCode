@@ -114,6 +114,8 @@ fun ChatDrawerContent(
     currentSessionId: String?,
     agentStates: Map<String, AgentUIState>,
     awaitingPermissionSessionIds: Set<String> = emptySet(),
+    sessionTitleFilter: String = "",
+    onSessionTitleFilterChange: (String) -> Unit = {},
     onSelect: (ChatSession) -> Unit,
     onDelete: (ChatSession) -> Unit,
     onRename: (ChatSession, String) -> Unit,
@@ -186,6 +188,8 @@ fun ChatDrawerContent(
                     currentSessionId = currentSessionId,
                     agentStates = agentStates,
                     awaitingPermissionSessionIds = awaitingPermissionSessionIds,
+                    sessionTitleFilter = sessionTitleFilter,
+                    onSessionTitleFilterChange = onSessionTitleFilterChange,
                     subSessionsByParent = subSessionsByParent,
                     listState = listState,
                     onSelect = onSelect,
@@ -319,6 +323,8 @@ private fun SessionListTab(
     currentSessionId: String?,
     agentStates: Map<String, AgentUIState>,
     awaitingPermissionSessionIds: Set<String>,
+    sessionTitleFilter: String,
+    onSessionTitleFilterChange: (String) -> Unit,
     subSessionsByParent: Map<String, List<ChatSession>>,
     listState: LazyListState,
     onSelect: (ChatSession) -> Unit,
@@ -338,25 +344,55 @@ private fun SessionListTab(
         }
         return
     }
+    // 标题过滤：仅作用于显示，空串显示全部
+    val filteredSessions = remember(sessions, sessionTitleFilter) {
+        if (sessionTitleFilter.isBlank()) sessions
+        else sessions.filter { it.title.contains(sessionTitleFilter, ignoreCase = true) }
+    }
+    if (filteredSessions.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                stringResource(R.string.chat_session_search_no_match),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = Spacing.md)
+            )
+        }
+        return
+    }
     var expandedIds by rememberSaveable(
         stateSaver = listSaver<Set<String>, String>(
             save = { it.toList() },
             restore = { it.toSet() }
         )
     ) { mutableStateOf(emptySet<String>()) }
-    val groups = remember(sessions) {
+    val groups = remember(filteredSessions) {
         val now = System.currentTimeMillis()
-        val pinned = sessions.filter { it.isPinned }
-        val unpinned = sessions.filterNot { it.isPinned }
+        val pinned = filteredSessions.filter { it.isPinned }
+        val unpinned = filteredSessions.filterNot { it.isPinned }
         buildList {
             if (pinned.isNotEmpty()) add(SessionGroup("pinned", pinned))
             addAll(buildSessionGroups(unpinned, now))
         }
     }
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize()
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        AppTextField(
+            value = sessionTitleFilter,
+            onValueChange = onSessionTitleFilterChange,
+            placeholder = stringResource(R.string.chat_session_search_hint),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.md, vertical = Spacing.xs)
+        )
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
         // 每个分组占一个 item、组内 forEach 全量渲染会让 LazyColumn 失去惰性：
         // 「最近 30 天」这种分组有上百个会话时，一个 item 就要组合上百行。分组头与会话各自成 item。
         groups.forEach { group ->
@@ -421,6 +457,7 @@ private fun SessionListTab(
                     }
                 }
             }
+        }
         }
     }
 }

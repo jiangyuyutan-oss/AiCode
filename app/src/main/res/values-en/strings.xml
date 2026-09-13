@@ -201,6 +201,11 @@
     <string name="agent_complete_notification_body">Tap to view</string>
     <string name="agent_complete_notification_background_body">Background task "%1$s" finished</string>
     <string name="agent_complete_notification_background_multi_body">%1$d background tasks finished</string>
+    <string name="notification_permission_title">Awaiting tool permission</string>
+    <string name="notification_permission_approve">Allow once</string>
+    <string name="notification_permission_deny">Deny</string>
+    <string name="notification_plan_title">Awaiting plan approval</string>
+    <string name="notification_plan_approve">Approve and build</string>
     <string name="notification_channel_terminal_service">Terminal Services</string>
     <string name="notification_channel_terminal_service_desc">Notifications for background terminal tasks</string>
     <string name="notification_channel_agent_complete">Agent completion notifications</string>
@@ -240,6 +245,8 @@
     <string name="common_paste">Paste</string>
     <string name="common_allow">Allow</string>
     <string name="common_close">Close</string>
+    <string name="common_search">Search</string>
+    <string name="common_loading">Loading…</string>
     <string name="workbench_split_handle">Drag to resize panes</string>
     <string name="common_other">Other</string>
     <string name="common_switch">Switch</string>
@@ -430,6 +437,13 @@
     <!-- Chat Drawer -->
     <string name="chat_history">History</string>
     <string name="chat_no_sessions_hint">No sessions yet</string>
+    <string name="chat_session_search_hint">Search session titles</string>
+    <string name="chat_session_search_no_match">No matching sessions</string>
+    <string name="chat_search_messages_hint">Search message content</string>
+    <string name="chat_search_no_results">No matching messages</string>
+    <string name="chat_search_role_user">Me</string>
+    <string name="chat_search_role_ai">AI</string>
+    <string name="chat_search_role_tool">Tool</string>
     <string name="session_group_today">Today</string>
     <string name="session_group_yesterday">Yesterday</string>
     <string name="session_group_last_7_days">Last 7 Days</string>

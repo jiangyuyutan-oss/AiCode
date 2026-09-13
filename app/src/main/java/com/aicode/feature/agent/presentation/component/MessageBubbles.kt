@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -170,6 +171,8 @@ internal fun AgentMessageItem(
     isChunkHeader: Boolean = true,
     /** 是否为分块的末块（渲染操作行、底部圆角、与下一条列表 item 的间距）；非分块消息恒为 true。 */
     isChunkFooter: Boolean = true,
+    /** 消息搜索跳转定位高亮：true 时气泡加主色描边与浅色底。 */
+    isHighlighted: Boolean = false,
 ) {
     if (message.isCompactionMarker) {
         // 压缩内部锚点不再渲染分隔线：摘要卡片已提供压缩反馈，避免与卡片重复。
@@ -234,6 +237,16 @@ internal fun AgentMessageItem(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (isHighlighted) {
+                    Modifier
+                        .clip(RoundedCornerShape(Radius.md))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), RoundedCornerShape(Radius.md))
+                } else {
+                    Modifier
+                }
+            )
             // LazyColumn 不再统一 spacedBy：末块（或非分块消息）自带与下一条 item 的间距，
             // 相邻分块之间零间距无缝衔接，整个长消息在外观上仍是一条气泡。
             .padding(bottom = if (isChunkFooter) Spacing.sm else 0.dp),

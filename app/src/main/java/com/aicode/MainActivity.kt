@@ -367,6 +367,7 @@ fun AppNavigation(
     val currentSessionId by agentViewModel.currentSessionId.collectAsStateWithLifecycle()
     val agentStates by agentViewModel.agentStates.collectAsStateWithLifecycle()
     val awaitingPermissionSessionIds by agentViewModel.awaitingPermissionSessionIds.collectAsStateWithLifecycle()
+    val sessionTitleFilter by agentViewModel.sessionTitleFilter.collectAsStateWithLifecycle()
     val subSessionsByParent by agentViewModel.subSessionsByParent.collectAsStateWithLifecycle()
     val expandedPaths by agentViewModel.expandedPaths.collectAsStateWithLifecycle()
     val browseState by agentViewModel.browseState.collectAsStateWithLifecycle()
@@ -462,6 +463,8 @@ fun AppNavigation(
             currentSessionId = currentSessionId,
             agentStates = agentStates,
             awaitingPermissionSessionIds = awaitingPermissionSessionIds,
+            sessionTitleFilter = sessionTitleFilter,
+            onSessionTitleFilterChange = { agentViewModel.setSessionTitleFilter(it) },
             subSessionsByParent = subSessionsByParent,
             browseState = browseState,
             expandedPaths = expandedPaths,

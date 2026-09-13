@@ -72,6 +72,19 @@ interface AgentMessageDao {
     @Query("SELECT * FROM agent_messages WHERE content LIKE '%' || :query || '%' ORDER BY timestamp ASC")
     suspend fun searchMessages(query: String): List<AgentMessageEntity>
 
+    /**
+     * 会话内消息全文搜索（未压缩、已落库），按时间倒序取前 [limit] 条。
+     * 只投影 4 列，避免 thinkingBlocksJson 等大字段进内存；查询词由调用方做 LIKE 转义。
+     */
+    @Query(
+        """
+        SELECT id, role, content, timestamp FROM agent_messages
+        WHERE sessionId = :sessionId AND isCompacted = 0 AND content LIKE '%' || :query || '%' ESCAPE '\'
+        ORDER BY timestamp DESC LIMIT :limit
+        """
+    )
+    suspend fun searchMessagesInSession(sessionId: String, query: String, limit: Int): List<AgentMessageSearchRow>
+
     @Query("SELECT * FROM agent_messages ORDER BY timestamp ASC")
     suspend fun getAllOnce(): List<AgentMessageEntity>
 
@@ -118,4 +131,12 @@ data class SessionStorageUsage(
     val title: String?,
     val messageCount: Int,
     val bytes: Long
+)
+
+/** 会话内消息搜索结果行（[AgentMessageDao.searchMessagesInSession] 的投影）。 */
+data class AgentMessageSearchRow(
+    val id: String,
+    val role: String,
+    val content: String,
+    val timestamp: Long
 )

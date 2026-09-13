@@ -201,6 +201,11 @@
     <string name="agent_complete_notification_body">点击返回查看</string>
     <string name="agent_complete_notification_background_body">后台任务「%1$s」已完成</string>
     <string name="agent_complete_notification_background_multi_body">%1$d 个后台任务已完成</string>
+    <string name="notification_permission_title">等待工具授权</string>
+    <string name="notification_permission_approve">允许一次</string>
+    <string name="notification_permission_deny">拒绝</string>
+    <string name="notification_plan_title">等待计划批准</string>
+    <string name="notification_plan_approve">批准执行</string>
     <string name="notification_channel_terminal_service">终端服务</string>
     <string name="notification_channel_terminal_service_desc">后台终端任务通知</string>
     <string name="notification_channel_agent_complete">Agent 完成通知</string>
@@ -240,6 +245,8 @@
     <string name="common_paste">粘贴</string>
     <string name="common_allow">允许</string>
     <string name="common_close">关闭</string>
+    <string name="common_search">搜索</string>
+    <string name="common_loading">加载中…</string>
     <string name="workbench_split_handle">拖动调整分栏宽度</string>
     <string name="common_other">其他</string>
     <string name="common_switch">切换</string>
@@ -430,6 +437,13 @@
     <!-- Chat Drawer -->
     <string name="chat_history">历史记录</string>
     <string name="chat_no_sessions_hint">暂无会话</string>
+    <string name="chat_session_search_hint">搜索会话标题</string>
+    <string name="chat_session_search_no_match">没有匹配的会话</string>
+    <string name="chat_search_messages_hint">搜索消息内容</string>
+    <string name="chat_search_no_results">没有匹配的消息</string>
+    <string name="chat_search_role_user">我</string>
+    <string name="chat_search_role_ai">AI</string>
+    <string name="chat_search_role_tool">工具</string>
     <string name="session_group_today">今天</string>
     <string name="session_group_yesterday">昨天</string>
     <string name="session_group_last_7_days">7天内</string>

@@ -268,6 +268,20 @@ fun AIChatPanel(
     val sessionTitle = currentSession?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.chat_new_session_btn)
     val sessionInputTokens = currentSession?.totalInputTokens ?: 0
     val sessionOutputTokens = currentSession?.totalOutputTokens ?: 0
+    // 会话内消息搜索：顶栏按钮开关面板，搜索/跳转/高亮状态在 ViewModel
+    val messageSearchQuery by viewModel.messageSearchQuery.collectAsStateWithLifecycle()
+    val messageSearchResults by viewModel.messageSearchResults.collectAsStateWithLifecycle()
+    val messageSearching by viewModel.messageSearching.collectAsStateWithLifecycle()
+    val pendingJumpMessageId by viewModel.pendingJumpMessageId.collectAsStateWithLifecycle()
+    val highlightMessageId by viewModel.highlightMessageId.collectAsStateWithLifecycle()
+    var searchOpen by remember { mutableStateOf(false) }
+    // 输入防抖：停顿 250ms 后自动搜索；键盘搜索键/回车即时触发
+    LaunchedEffect(messageSearchQuery) {
+        if (messageSearchQuery.isNotBlank()) {
+            delay(250)
+            viewModel.searchMessages()
+        }
+    }
     val sessionLastInputTokens = currentSession?.lastInputTokens ?: 0
     val messagesReady = messagesState.loaded && messagesState.sessionId == currentSessionId
     val runningTool by viewModel.runningTool.collectAsStateWithLifecycle()
@@ -831,6 +845,11 @@ fun AIChatPanel(
                     onOpenDrawer()
                 },
                 onNewChat = { viewModel.newSession() },
+                onToggleSearch = {
+                    searchOpen = !searchOpen
+                    if (!searchOpen) viewModel.clearMessageSearch()
+                },
+                searchActive = searchOpen,
                 onNavigateToTerminal = onNavigateToTerminal,
                 onNavigateToGit = onNavigateToGit,
                 currentMode = currentMode,
@@ -926,6 +945,19 @@ fun AIChatPanel(
                             }
                         }.flatten()
                     }
+                    // 消息搜索跳转：定位滚动 + 高亮；目标不在已加载分页时扩页重试（messages 变化重新触发），
+                    // 扩到上限仍找不到则 ViewModel 清空请求结束。
+                    LaunchedEffect(pendingJumpMessageId, chatItems) {
+                        val targetId = pendingJumpMessageId ?: return@LaunchedEffect
+                        val index = chatItems.indexOfFirst { it.message.id == targetId }
+                        if (index < 0) {
+                            viewModel.expandMessageLimitForJump()
+                        } else {
+                            listState.scrollToItem(index)
+                            viewModel.highlightMessage(targetId)
+                            viewModel.clearPendingJump()
+                        }
+                    }
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -946,6 +978,7 @@ fun AIChatPanel(
                                 contentSlice = item.slice,
                                 isChunkHeader = item.isChunkHeader,
                                 isChunkFooter = item.isChunkFooter,
+                                isHighlighted = message.id == highlightMessageId,
                                 onRewindClick = { viewModel.openRewindMenu(it) },
                                 onMoreClick = { messageForMenu = it },
                                 onToolToggle = {
@@ -1207,6 +1240,32 @@ fun AIChatPanel(
                     .onboardingTarget(OnboardingStep.SEND_MESSAGE)
             )
             } // 悬浮层结束
+
+            // 消息搜索面板：顶栏搜索按钮开关，悬浮在消息列表上方；点击结果请求跳转并收起面板
+            androidx.compose.animation.AnimatedVisibility(
+                visible = searchOpen,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .widthIn(max = readableContentMaxWidth()),
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                MessageSearchPanel(
+                    query = messageSearchQuery,
+                    results = messageSearchResults,
+                    searching = messageSearching,
+                    onQueryChange = { viewModel.setMessageSearchQuery(it) },
+                    onSearch = { viewModel.searchMessages() },
+                    onResultClick = { result ->
+                        viewModel.requestJumpToMessage(result.id)
+                        searchOpen = false
+                    },
+                    onClose = {
+                        searchOpen = false
+                        viewModel.clearMessageSearch()
+                    }
+                )
+            }
 
             // 滚动到底部按钮：悬浮在输入框右上角上方（悬浮层高度 + 间距定位），离底超过半屏时
             // 显示，不看滚动方向——往上翻历史后停住恰恰是最需要一键回底的时刻；滚动时跟随输入框淡出。

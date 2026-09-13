@@ -34,6 +34,7 @@ import com.aicode.feature.agent.domain.model.AgentMode
 import com.aicode.feature.agent.domain.model.ChatSession
 import com.aicode.feature.agent.domain.model.ReasoningEffort
 import com.aicode.feature.agent.domain.notification.AgentNotificationCenter
+import com.aicode.feature.agent.domain.notification.AgentInteractionNotificationManager
 import com.aicode.feature.agent.domain.notification.AgentNotificationFormatter
 import com.aicode.feature.agent.domain.notification.AgentNotificationKind
 import com.aicode.feature.agent.domain.notification.NotificationOutcome
@@ -82,6 +83,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,6 +105,14 @@ import kotlinx.coroutines.launch
 import java.io.OutputStream
 import java.util.UUID
 import javax.inject.Inject
+
+/** 消息全文搜索单条结果（角色 + 命中片段 + 时间），供搜索面板渲染。 */
+data class MessageSearchResult(
+    val id: String,
+    val role: String,
+    val snippet: String,
+    val timestamp: Long
+)
 
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
@@ -130,6 +140,7 @@ class AIAgentViewModel @Inject constructor(
     private val keepaliveSettings: KeepaliveSettingsRepository,
     private val subAgentEventBus: SubAgentEventBus,
     private val agentNotificationCenter: AgentNotificationCenter,
+    private val interactionNotificationManager: AgentInteractionNotificationManager,
     private val agentDefinitionRepository: AgentDefinitionRepository,
     val fileAccess: FileAccessProvider,
     private val dirWatcher: WorkspaceDirWatcher,
@@ -244,6 +255,76 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
+    /** 会话内消息全文搜索：LIKE 转义后查已落库未压缩消息，倒序至多 50 条。 */
+    fun searchMessages() {
+        val sid = _currentSessionId.value ?: return
+        val query = _messageSearchQuery.value.trim()
+        if (query.isEmpty()) {
+            _messageSearchResults.value = emptyList()
+            return
+        }
+        viewModelScope.launch {
+            _messageSearching.value = true
+            try {
+                val rows = agentMessageDao.searchMessagesInSession(
+                    sid, MessageSearchUtils.escapeLike(query), MESSAGE_SEARCH_LIMIT
+                )
+                _messageSearchResults.value = rows.map { row ->
+                    MessageSearchResult(
+                        id = row.id,
+                        role = row.role,
+                        snippet = MessageSearchUtils.buildSearchSnippet(row.content, query),
+                        timestamp = row.timestamp
+                    )
+                }
+            } catch (e: Exception) {
+                FileLogger.w(TAG, "搜索消息失败", e)
+                _messageSearchResults.value = emptyList()
+            } finally {
+                _messageSearching.value = false
+            }
+        }
+    }
+
+    fun setMessageSearchQuery(query: String) {
+        _messageSearchQuery.value = query
+        if (query.isBlank()) _messageSearchResults.value = emptyList()
+    }
+
+    fun clearMessageSearch() {
+        _messageSearchQuery.value = ""
+        _messageSearchResults.value = emptyList()
+        _pendingJumpMessageId.value = null
+    }
+
+    /** 请求跳转到指定消息：UI 在消息列表定位；未在已加载分页时按需扩页。 */
+    fun requestJumpToMessage(id: String) {
+        _pendingJumpMessageId.value = id
+    }
+
+    fun clearPendingJump() {
+        _pendingJumpMessageId.value = null
+    }
+
+    /** 跳转扩页：单次 +100，至上限 1000（消息列表加载范围上限）。 */
+    fun expandMessageLimitForJump() {
+        val sid = _currentSessionId.value ?: return
+        val current = _messageLimit.value[sid] ?: defaultLimit
+        if (current >= MAX_MESSAGE_LIMIT_FOR_JUMP) {
+            _pendingJumpMessageId.value = null
+            return
+        }
+        _messageLimit.value = _messageLimit.value + (sid to (current + 100).coerceAtMost(MAX_MESSAGE_LIMIT_FOR_JUMP))
+    }
+
+    fun highlightMessage(id: String) {
+        _highlightMessageId.value = id
+        viewModelScope.launch {
+            delay(HIGHLIGHT_CLEAR_DELAY_MS)
+            if (_highlightMessageId.value == id) _highlightMessageId.value = null
+        }
+    }
+
     /**
      * 旁路 LLM 调用用的近期对话上下文：取最近几条消息，按类型截断正文并剥离
      * thinking/签名/工具调用等主循环专用字段，控制 token 成本。
@@ -280,7 +361,6 @@ class AIAgentViewModel @Inject constructor(
 
     /** 容器初始化实时进度（解压/部署/装包），AI 页底部气泡展示。 */
     val containerInit: StateFlow<ContainerInitState> = containerEngine.initProgress
-
     private val _currentWorkspace = MutableStateFlow<String>("")
     fun setWorkspace(path: String) {
         if (path.isBlank() || _currentWorkspace.value == path) return
@@ -597,6 +677,33 @@ class AIAgentViewModel @Inject constructor(
     private val _optimizingInput = MutableStateFlow(false)
     val optimizingInput: StateFlow<Boolean> = _optimizingInput.asStateFlow()
 
+    /** 会话列表标题过滤词（空串显示全部）。 */
+    private val _sessionTitleFilter = MutableStateFlow("")
+    val sessionTitleFilter: StateFlow<String> = _sessionTitleFilter.asStateFlow()
+
+    fun setSessionTitleFilter(filter: String) {
+        _sessionTitleFilter.value = filter
+    }
+
+    /** 消息搜索面板输入词（空串=未搜索）。 */
+    private val _messageSearchQuery = MutableStateFlow("")
+    val messageSearchQuery: StateFlow<String> = _messageSearchQuery.asStateFlow()
+
+    /** 消息全文搜索结果（倒序，至多 50 条）。 */
+    private val _messageSearchResults = MutableStateFlow<List<MessageSearchResult>>(emptyList())
+    val messageSearchResults: StateFlow<List<MessageSearchResult>> = _messageSearchResults.asStateFlow()
+
+    private val _messageSearching = MutableStateFlow(false)
+    val messageSearching: StateFlow<Boolean> = _messageSearching.asStateFlow()
+
+    /** 跳转请求：消息搜索结果点击后设置，UI 在消息列表中定位滚动；完成或超限后清空。 */
+    private val _pendingJumpMessageId = MutableStateFlow<String?>(null)
+    val pendingJumpMessageId: StateFlow<String?> = _pendingJumpMessageId.asStateFlow()
+
+    /** 跳转定位成功后高亮该消息，5 秒自动清除。 */
+    private val _highlightMessageId = MutableStateFlow<String?>(null)
+    val highlightMessageId: StateFlow<String?> = _highlightMessageId.asStateFlow()
+
     /** 当前会话的思考强度（默认 MEDIUM）。 */
     val currentSessionReasoningEffort: StateFlow<ReasoningEffort> =
         currentSessionState.map { it?.reasoningEffort ?: ReasoningEffort.MEDIUM }
@@ -842,6 +949,13 @@ class AIAgentViewModel @Inject constructor(
         const val TAG = "AIAgentViewModel"
         const val AGENT_COMPLETE_CHANNEL = "agent_complete"
         const val AGENT_COMPLETE_NOTIFICATION_ID = 100
+        /** 消息全文搜索单次返回上限。 */
+        const val MESSAGE_SEARCH_LIMIT = 50
+        /** 跳转定位允许扩到的消息加载上限。 */
+        const val MAX_MESSAGE_LIMIT_FOR_JUMP = 1000
+        /** 跳转高亮自动清除延迟。 */
+        const val HIGHLIGHT_CLEAR_DELAY_MS = 5000L
+
         /** wakeLock 超时保险：构建、装依赖类工具动辄十几分钟，给足 60 分钟；任务正常结束会主动释放。 */
         const val KEEPALIVE_TIMEOUT_MS = 60 * 60 * 1000L
         /** 从后台任务通知文本中提取 <title> 内容，供系统通知正文展示。 */
@@ -910,7 +1024,38 @@ class AIAgentViewModel @Inject constructor(
                 }
             }
         }
+
+        // 后台交互通知：App 在后台时 AI 等待工具权限/计划批准 → 发系统通知带快捷操作按钮，
+        // 点击经 NotificationActionReceiver 路由回 resolveToolPermission / approvePlanAndBuild；
+        // 请求被任何路径解决后 pending 置空，这里统一取消通知。
+        viewModelScope.launch {
+            toolPermissionManager.pendingRequest.collect { request ->
+                if (request == null) {
+                    interactionNotificationManager.cancelPermission()
+                } else if (!isAppInForeground()) {
+                    interactionNotificationManager.notifyPermission(request) { choice ->
+                        resolveToolPermission(request.id, choice)
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            planApprovalManager.pendingApproval.collect { approval ->
+                if (approval == null) {
+                    interactionNotificationManager.cancelPlan()
+                } else if (!isAppInForeground()) {
+                    // 通知正文用批准理由（AI 的切换说明），比当前会话标题更贴近请求内容
+                    interactionNotificationManager.notifyPlan(approval.reason) {
+                        approvePlanAndBuild()
+                    }
+                }
+            }
+        }
     }
+
+    /** App 是否在前台：与 agent 完成通知的判断口径一致。 */
+    private fun isAppInForeground(): Boolean =
+        ProcessLifecycleOwner.get().lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
 
     /**
      * 子代理已创建（task 工具已创建子会话）：在子会话上启动 AI 工作流。

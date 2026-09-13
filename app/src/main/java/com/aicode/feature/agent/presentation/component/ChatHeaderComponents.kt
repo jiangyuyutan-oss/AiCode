@@ -42,6 +42,7 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.GitBranch
 import compose.icons.feathericons.Menu
 import compose.icons.feathericons.Plus
+import compose.icons.feathericons.Search
 import compose.icons.feathericons.Terminal
 
 @Composable
@@ -52,6 +53,8 @@ internal fun ChatHeader(
     outputTokens: Int,
     onOpenDrawer: () -> Unit,
     onNewChat: () -> Unit,
+    onToggleSearch: () -> Unit,
+    searchActive: Boolean = false,
     onNavigateToTerminal: () -> Unit,
     onNavigateToGit: () -> Unit,
     currentMode: AgentMode,
@@ -113,6 +116,12 @@ internal fun ChatHeader(
                         )
                     }
                 }
+                WorkbenchIconButton(
+                    icon = FeatherIcons.Search,
+                    contentDescription = stringResource(R.string.common_search),
+                    active = searchActive,
+                    onClick = onToggleSearch
+                )
                 IconButton(onClick = onNewChat) {
                     Icon(
                         FeatherIcons.Plus,
