@@ -5,6 +5,9 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aicode.core.net.AppProxy
+import com.aicode.core.ui.glass.GlassMode
+import com.aicode.core.ui.glass.GlassPanelArea
+import com.aicode.core.ui.glass.GlassSettings
 import com.aicode.core.util.FileLogger
 import com.aicode.core.util.LogLevel
 import com.aicode.feature.agent.data.local.dao.LlmCallRecordDao
@@ -468,6 +471,10 @@ class SettingsViewModel @Inject constructor(
         MutableStateFlow(BackgroundSettingsRepository.DEFAULT_FROST_INTENSITY)
     val frostIntensity: StateFlow<Float> = _frostIntensity.asStateFlow()
 
+    /** 玻璃材质全局配置聚合（含半径换算），供 glassPanel Modifier 与设置面板消费。 */
+    private val _glassState = MutableStateFlow(GlassSettings.DISABLED)
+    val glassState: StateFlow<GlassSettings> = _glassState.asStateFlow()
+
     /** 透明度落盘的节流 job，见 [setBackgroundAlpha]。 */
     private var backgroundAlphaWriteJob: Job? = null
     private var frostIntensityWriteJob: Job? = null
@@ -741,6 +748,12 @@ class SettingsViewModel @Inject constructor(
             launch {
                 backgroundSettingsRepository.frostIntensityFlow.collectLatest {
                     _frostIntensity.value = it
+                }
+            }
+
+            launch {
+                backgroundSettingsRepository.glassStateFlow.collectLatest {
+                    _glassState.value = it
                 }
             }
 
@@ -1310,6 +1323,24 @@ class SettingsViewModel @Inject constructor(
             delay(BACKGROUND_ALPHA_WRITE_DEBOUNCE_MS)
             backgroundSettingsRepository.setFrostIntensity(bounded)
         }
+    }
+
+    fun setGlassEnabled(enabled: Boolean) {
+        viewModelScope.launch { backgroundSettingsRepository.setGlassEnabled(enabled) }
+    }
+
+    fun setGlassMode(mode: GlassMode) {
+        viewModelScope.launch { backgroundSettingsRepository.setGlassMode(mode) }
+    }
+
+    fun setGlassPanelAreaEnabled(area: GlassPanelArea, enabled: Boolean) {
+        viewModelScope.launch {
+            backgroundSettingsRepository.setGlassPanelAreaEnabled(area, enabled)
+        }
+    }
+
+    fun setWaterWaveAnimated(animated: Boolean) {
+        viewModelScope.launch { backgroundSettingsRepository.setWaterWaveAnimated(animated) }
     }
 
     /** 设置应用语言；tag 为空字符串或 null 表示跟随系统。 */

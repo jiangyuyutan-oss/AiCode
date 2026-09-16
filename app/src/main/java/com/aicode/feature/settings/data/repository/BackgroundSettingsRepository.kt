@@ -2,13 +2,18 @@ package com.aicode.feature.settings.data.repository
 
 import android.content.Context
 import android.net.Uri
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.aicode.core.ui.glass.GlassMode
+import com.aicode.core.ui.glass.GlassPanelArea
+import com.aicode.core.ui.glass.GlassSettings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -38,6 +43,29 @@ class BackgroundSettingsRepository @Inject constructor(
         const val DEFAULT_FROST_INTENSITY = 0.5f
         const val MIN_FROST_INTENSITY = 0f
         const val MAX_FROST_INTENSITY = 1f
+        private val GLASS_ENABLED_KEY = booleanPreferencesKey("glass_enabled")
+        private val GLASS_MODE_KEY = stringPreferencesKey("glass_mode")
+        private val GLASS_SIDEBAR_ENABLED_KEY = booleanPreferencesKey("glass_sidebar_enabled")
+        private val GLASS_INPUT_ENABLED_KEY = booleanPreferencesKey("glass_input_enabled")
+        private val GLASS_CONTENT_ENABLED_KEY = booleanPreferencesKey("glass_content_enabled")
+        private val WATER_WAVE_ANIMATED_KEY = booleanPreferencesKey("water_wave_animated")
+
+        const val MODE_FROSTED = "frosted"
+        const val MODE_WATER = "water"
+        const val MODE_LIQUID = "liquid"
+
+        /** 未知值与未设置一律回退磨砂档。 */
+        fun parseGlassMode(raw: String?): GlassMode = when (raw) {
+            MODE_WATER -> GlassMode.WATER
+            MODE_LIQUID -> GlassMode.LIQUID
+            else -> GlassMode.FROSTED
+        }
+
+        fun glassModeToRaw(mode: GlassMode): String = when (mode) {
+            GlassMode.FROSTED -> MODE_FROSTED
+            GlassMode.WATER -> MODE_WATER
+            GlassMode.LIQUID -> MODE_LIQUID
+        }
 
         /** 把 UI 百分比（0~100）线性映射为实际透明度（0~MAX_ALPHA）。 */
         fun sliderToAlpha(percent: Float): Float =
@@ -66,6 +94,55 @@ class BackgroundSettingsRepository @Inject constructor(
         (it[FROST_INTENSITY_KEY] ?: DEFAULT_FROST_INTENSITY)
             .coerceIn(MIN_FROST_INTENSITY, MAX_FROST_INTENSITY)
     }
+
+    val glassEnabledFlow: Flow<Boolean> = context.backgroundDataStore.data.map {
+        it[GLASS_ENABLED_KEY] ?: false
+    }
+
+    val glassModeFlow: Flow<GlassMode> = context.backgroundDataStore.data.map {
+        parseGlassMode(it[GLASS_MODE_KEY])
+    }
+
+    val glassSidebarEnabledFlow: Flow<Boolean> = context.backgroundDataStore.data.map {
+        it[GLASS_SIDEBAR_ENABLED_KEY] ?: true
+    }
+
+    val glassInputEnabledFlow: Flow<Boolean> = context.backgroundDataStore.data.map {
+        it[GLASS_INPUT_ENABLED_KEY] ?: true
+    }
+
+    val glassContentEnabledFlow: Flow<Boolean> = context.backgroundDataStore.data.map {
+        it[GLASS_CONTENT_ENABLED_KEY] ?: true
+    }
+
+    val waterWaveAnimatedFlow: Flow<Boolean> = context.backgroundDataStore.data.map {
+        it[WATER_WAVE_ANIMATED_KEY] ?: false
+    }
+
+    /** 玻璃配置聚合流：半径 = frost_intensity × 32dp，三档共用同一换算点。 */
+    val glassStateFlow: Flow<GlassSettings> =
+        combine(
+            combine(
+                glassEnabledFlow,
+                glassModeFlow,
+                glassSidebarEnabledFlow,
+                glassInputEnabledFlow,
+                glassContentEnabledFlow,
+            ) { enabled, mode, sidebar, input, content ->
+                GlassPrefs(enabled, mode, sidebar, input, content)
+            },
+            combine(frostIntensityFlow, waterWaveAnimatedFlow, ::Pair),
+        ) { core, (frost, animated) ->
+            GlassSettings(
+                enabled = core.enabled,
+                mode = core.mode,
+                sidebarEnabled = core.sidebar,
+                inputEnabled = core.input,
+                contentEnabled = core.content,
+                radiusDp = frost * GlassSettings.MAX_RADIUS_DP,
+                waterWaveAnimated = animated,
+            )
+        }
 
     /**
      * 选择新背景图：把 [uri] 拷贝到私有目录 backgrounds/ 后替换旧图。
@@ -108,6 +185,39 @@ class BackgroundSettingsRepository @Inject constructor(
                 intensity.coerceIn(MIN_FROST_INTENSITY, MAX_FROST_INTENSITY)
         }
     }
+
+    suspend fun setGlassEnabled(enabled: Boolean) {
+        context.backgroundDataStore.edit { it[GLASS_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun setGlassMode(mode: GlassMode) {
+        context.backgroundDataStore.edit { it[GLASS_MODE_KEY] = glassModeToRaw(mode) }
+    }
+
+    suspend fun setGlassPanelAreaEnabled(
+        area: GlassPanelArea,
+        enabled: Boolean,
+    ) {
+        context.backgroundDataStore.edit {
+            when (area) {
+                GlassPanelArea.SIDEBAR -> it[GLASS_SIDEBAR_ENABLED_KEY] = enabled
+                GlassPanelArea.INPUT -> it[GLASS_INPUT_ENABLED_KEY] = enabled
+                GlassPanelArea.CONTENT -> it[GLASS_CONTENT_ENABLED_KEY] = enabled
+            }
+        }
+    }
+
+    suspend fun setWaterWaveAnimated(animated: Boolean) {
+        context.backgroundDataStore.edit { it[WATER_WAVE_ANIMATED_KEY] = animated }
+    }
+
+    private data class GlassPrefs(
+        val enabled: Boolean,
+        val mode: GlassMode,
+        val sidebar: Boolean,
+        val input: Boolean,
+        val content: Boolean,
+    )
 
     private fun extensionFor(uri: Uri): String = when (context.contentResolver.getType(uri)) {
         "image/png" -> "png"

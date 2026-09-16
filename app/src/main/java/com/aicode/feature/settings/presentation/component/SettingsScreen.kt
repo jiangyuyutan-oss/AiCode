@@ -207,6 +207,7 @@ fun SettingsScreen(
     val backgroundImagePath by viewModel.backgroundImagePath.collectAsStateWithLifecycle()
     val backgroundAlpha by viewModel.backgroundAlpha.collectAsStateWithLifecycle()
     val frostIntensity by viewModel.frostIntensity.collectAsStateWithLifecycle()
+    val glassState by viewModel.glassState.collectAsStateWithLifecycle()
     val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
     val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
     val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
@@ -961,7 +962,12 @@ fun SettingsScreen(
             onAlphaChange = { viewModel.setBackgroundAlpha(it) },
             onFrostIntensityChange = { viewModel.setFrostIntensity(it) },
             onRemove = { viewModel.clearBackgroundImage() },
-            onDismiss = { showBackgroundSheet = false }
+            onDismiss = { showBackgroundSheet = false },
+            glassState = glassState,
+            onGlassEnabledChange = { viewModel.setGlassEnabled(it) },
+            onGlassModeChange = { viewModel.setGlassMode(it) },
+            onGlassAreaEnabledChange = { area, enabled -> viewModel.setGlassPanelAreaEnabled(area, enabled) },
+            onWaterWaveAnimatedChange = { viewModel.setWaterWaveAnimated(it) },
         )
     }
 

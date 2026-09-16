@@ -9,16 +9,20 @@ Updated: 2026-09-16
 
 ## 2. 设计决策
 
-### 2.1 复用 backdrop 库（`io.github.kyant0:backdrop:2.0.1`）
+### 2.1 复用 backdrop 库（`io.github.kyant0:backdrop:1.0.6`）
 
 选型结论（调研于 2026-09-16）：
 
 | 候选 | 结论 |
 | --- | --- |
-| Kyant0/AndroidLiquidGlass | 采纳：3.8k stars、持续发版（2.0.1，2026-08）、Compose 原生、minSdk 21、内置 blur/lens/vibrancy 且提供 `runtimeShaderEffect` 自定义扩展点 |
+| Kyant0/AndroidLiquidGlass | 采纳：3.8k stars、持续发版、Compose 原生、minSdk 21、内置 blur/lens/vibrancy |
 | QmDeve/AndroidLiquidGlassView | 排除：View 体系，与 Compose 架构不匹配 |
 | Haze | 排除：仅模糊，折射/透镜需自研补齐 |
 | neilyich/glassmorphism-compose | 排除：功能弱 |
+
+**版本锁定 1.0.6**：2.0+ 编译于 compileSdk 37，与项目 AGP 8.9.3（最高支持 SDK 36）冲突；1.0.6 编译于 compileSdk 36、jvmToolchain 21，与项目完全兼容。API 表面（drawBackdrop / effects DSL / blur / lens / vibrancy / rememberLayerBackdrop / layerBackdrop）与 2.0 一致。
+
+**1.0.6 与 2.0 API 差异**：1.0.6 的 effects 无 `runtimeShaderEffect`（2.0 新增）。水玻璃档改用平台 API `android.graphics.RenderEffect.createRuntimeShaderEffect(RuntimeShader, uniformShaderName)` 构造后经库的 `effect(RenderEffect)` 链入效果链——`createChainEffect` 顺序保证 RuntimeShader 采样到上游 blur 输出，与 2.0 语义等价。
 
 库的效果链约束：`color filter ⇒ blur ⇒ lens` 顺序生效；`lens` 需要 `CornerBasedShape`；效果仅 Android 12+，`RuntimeShader` 类效果需 Android 13+。
 
@@ -118,8 +122,8 @@ fun Modifier.glassPanel(
 ### 4.3 `core/ui/glass/WaterWaveShader.kt` — 水波 AGSL
 
 - AGSL 源码字符串：正弦叠加波浪对上游 shader 采样坐标做 UV 偏移（折射）
-- `uniformShaderName` 链式采样上游（blur 之后），静态模式 `uTime` 固定值，动画模式时间驱动相位
-- `runtimeEffect` 在首次组合时构造校验，异常时回退为纯 blur（shader 语法错误防护，非崩溃自愈）
+- 1.0.6 无 `runtimeShaderEffect`，水玻璃档在 `GlassPanel` 内 `remember` 一个 `android.graphics.RuntimeShader`，effects block 中 `setFloatUniform` 后用 `RenderEffect.createRuntimeShaderEffect(shader, "uContent")` + 库 `effect()` 链入；`uniformShaderName = uContent` 链式采样上游 blur 输出
+- 静态模式 `uTime` 固定值（[WATER_WAVE_STATIC_TIME]），动画模式 `withFrameNanos` 时间驱动相位
 
 ### 4.4 `BackgroundSettingsRepository` 扩展
 

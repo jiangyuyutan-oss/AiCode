@@ -7,29 +7,29 @@ Updated: 2026-09-16
 
 ```text
 [TODOLIST]
-T1   app/build.gradle.kts 引入 io.github.kyant0:backdrop:2.0.1 并同步验证
-T2   新建 core/ui/glass/GlassMode.kt（枚举 + GlassSettings + LocalGlassSettings）
-T3   BackgroundSettingsRepository 新增 6 键 Flow/setter + glassStateFlow 聚合
-T4   SettingsViewModel 新增 glassState 聚合与节流写入方法
-T5   数据层单元测试（键默认值/容错解析/半径换算）
-T6   GlassPanel.kt glassPanel Modifier（三档效果链 + onDrawSurface 染色 + API33 门槛）
-T7   WaterWaveShader.kt 水波 AGSL（静态水纹 + 时间驱动动画 + 构造异常回退）
-T8   M3 冒烟编译 ./gradlew :app:assembleUniversalDebug
-T9   MainActivity 壁纸层 Modifier.backdrop() 源标记 + Backdrop scope + CompositionLocalProvider
-T10  侧边栏容器接线 glassPanel（区域开关短路）
-T11  输入框容器接线 glassPanel（区域开关短路）
-T12  内容面板容器接线 glassPanel（区域开关短路）
-T13  M4 编译验证 ./gradlew :app:assembleUniversalDebug
-T14  BackgroundImageSheet 扩展：总开关 + 档位 SegmentedTabs + 半径滑条升级
-T15  BackgroundImageSheet 扩展：三区域开关 + 水波动画开关（water 档显示）+ API<33 禁用提示
-T16  双语 strings.xml 新增玻璃设置文案（中英同步）
-T17  M5 编译验证 ./gradlew :app:assembleUniversalDebug
-T18  水波动画生命周期停帧（不可见/后台无动画帧）
-T19  全量单测 ./gradlew :app:testUniversalDebugUnitTest
-T20  真机验证包准备（assembleUniversalDebug APK + 验证清单：三档/三区域/动画/半径/深浅主题/重启保留/API26-30 现状一致）
-T21  文档同步 docs-site/docs/（背景设置文档更新玻璃材质章节 + config.ts 侧栏核对）
-T22  prompts 同步检查（设置项变化核对 assets/prompts/ 对应文件）
-T23  汇报 + 提交（Conventional Commits，逐里程碑分批 commit）
+T1   app/build.gradle.kts 引入 io.github.kyant0:backdrop:1.0.6（锁定 1.0.6：2.0+ 需 SDK 37 与项目 AGP 8.9.3 冲突，1.0.6 编译于 SDK 36 兼容）✅
+T2   新建 core/ui/glass/GlassMode.kt（枚举 + GlassSettings + LocalGlassSettings + LocalBackdrop + GlassPanelArea + isEnabled 扩展）✅
+T3   BackgroundSettingsRepository 新增 6 键 Flow/setter + glassStateFlow 聚合（radiusDp = frost × 32）✅
+T4   SettingsViewModel 新增 glassState 聚合与写入方法 ✅
+T5   数据层单元测试（键默认值/容错解析/半径换算/聚合）✅
+T6   GlassPanel.kt glassPanel Modifier（三档效果链 + onDrawSurface 染色 + API33 门槛，backdrop 从 LocalBackdrop 读）✅
+T7   WaterWaveShader.kt 水波 AGSL（1.0.6 无 runtimeShaderEffect，改用平台 RenderEffect.createRuntimeShaderEffect + 库 effect() 链入）✅
+T8   M3 冒烟编译 ./gradlew :app:assembleUniversalDebug ✅
+T9   MainActivity 壁纸层 Modifier.layerBackdrop() 源标记 + rememberLayerBackdrop + CompositionLocalProvider ✅
+T10  侧边栏容器接线 glassPanel（窄屏 ModalDrawerSheet + 大屏 Box，容器色条件透明）✅
+T11  输入框容器接线 glassPanel（ChatInputBar L265 条件替代 background）✅
+T12  内容面板容器接线 glassPanel（AIChatPanel 消息列表 weight Box）✅
+T13  M4 编译验证 ./gradlew :app:assembleUniversalDebug ✅
+T14  BackgroundImageSheet 扩展：总开关 + 档位 SegmentedTabs + API<33 提示 ✅
+T15  BackgroundImageSheet 扩展：三区域开关 + 水波动画开关（water 档显示）✅
+T16  双语 strings.xml 新增 13 条玻璃设置文案 ✅
+T17  M5 编译验证 ./gradlew :app:assembleUniversalDebug ✅
+T18  水波动画生命周期停帧（withFrameNanos 随 Compose frame clock 自动挂起）✅
+T19  全量单测 ./gradlew :app:testUniversalDebugUnitTest ✅
+T20  真机验证包 app/build/outputs/apk/universal/debug/app-universal-debug.apk ✅（待真机三档/三区域/动画/半径/深浅主题/重启保留/API26-30 现状一致 验证）
+T21  文档同步 docs-site/docs/guide/appearance.md 玻璃材质章节 ✅
+T22  prompts 同步检查（玻璃为 UI 渲染层，无 agent 工具行为变化，无需同步）✅
+T23  汇报 + 提交（Conventional Commits）⏳
 ```
 
 ## 里程碑

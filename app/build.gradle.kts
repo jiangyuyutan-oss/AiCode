@@ -282,6 +282,9 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.animation:animation")
 
+    // 液体玻璃材质（backdrop：blur/lens/AGSL 效果链）——锁定 1.0.6：compileSdk 36 与项目 AGP 8.9.3 兼容（2.0+ 要求 SDK 37）
+    implementation("io.github.kyant0:backdrop:1.0.6")
+
     // Vico 图表（Token 统计趋势图）
     implementation("com.patrykandpatrick.vico:compose-m3:2.4.4")
 

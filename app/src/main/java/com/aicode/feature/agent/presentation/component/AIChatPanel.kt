@@ -62,6 +62,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicode.R
 import com.aicode.core.theme.Spacing
+import com.aicode.core.ui.glass.GlassPanelArea
+import com.aicode.core.ui.glass.LocalGlassSettings
+import com.aicode.core.ui.glass.glassPanel
+import com.aicode.core.ui.glass.isEnabled
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.aicode.core.ui.ImageViewerHost
 import com.aicode.core.ui.LocalImageViewer
 import com.aicode.core.ui.readableContentMaxWidth
@@ -884,7 +889,19 @@ fun AIChatPanel(
                     failCount = goalFailCount
                 )
             }
-            Box(modifier = Modifier.weight(1f)) {
+            val contentGlass = LocalGlassSettings.current
+            val contentGlassOn = contentGlass.enabled &&
+                contentGlass.isEnabled(GlassPanelArea.CONTENT) &&
+                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (contentGlassOn) Modifier.glassPanel(
+                            RoundedCornerShape(0.dp), GlassPanelArea.CONTENT
+                        ) else Modifier
+                    )
+            ) {
                 if (!messagesReady) {
                     // 远程模式连接未就绪时显示连接状态占位，避免空白或旧工作区记录闪烁
                     if (isRemote && connectionState != null && connectionState != com.aicode.feature.agent.domain.container.ConnectionState.CONNECTED) {
