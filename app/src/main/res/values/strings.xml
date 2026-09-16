@@ -1019,6 +1019,9 @@
     <string name="provider_no_matching_models">没有匹配的模型</string>
     <string name="provider_please_wait">请稍候…</string>
     <string name="provider_test">测试</string>
+    <string name="provider_test_all">测试全部</string>
+    <string name="provider_test_stop">停止</string>
+    <string name="provider_test_batch_summary">已测 %1$d/共 %2$d · 成功 %3$d</string>
 
     <!-- Provider Logo -->
     <string name="provider_brand_doubao">豆包</string>

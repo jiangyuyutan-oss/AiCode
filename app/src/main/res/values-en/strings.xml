@@ -1019,6 +1019,9 @@
     <string name="provider_no_matching_models">No matching models</string>
     <string name="provider_please_wait">Please wait…</string>
     <string name="provider_test">Test</string>
+    <string name="provider_test_all">Test all</string>
+    <string name="provider_test_stop">Stop</string>
+    <string name="provider_test_batch_summary">Tested %1$d/%2$d · %3$d ok</string>
 
     <!-- Provider Logo -->
     <string name="provider_brand_doubao">Doubao</string>

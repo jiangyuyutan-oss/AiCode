@@ -152,6 +152,8 @@ import compose.icons.feathericons.Slash
 import compose.icons.feathericons.Sliders
 import compose.icons.feathericons.Trash2
 import compose.icons.feathericons.X
+import compose.icons.feathericons.Square
+import compose.icons.feathericons.Zap
 import com.aicode.feature.agent.presentation.component.AdaptiveCardView
 import com.aicode.feature.settings.domain.model.ProviderBalanceResult
 import com.aicode.feature.settings.domain.model.ProviderBalanceState
@@ -254,6 +256,7 @@ fun ProviderEditorScreen(
     val fetchState by viewModel.fetchState.collectAsStateWithLifecycle()
     val testResults by viewModel.testResults.collectAsStateWithLifecycle()
     val testing by viewModel.testing.collectAsStateWithLifecycle()
+    val batchTestState by viewModel.batchTestState.collectAsStateWithLifecycle()
     val proxyTestState by viewModel.proxyTestState.collectAsStateWithLifecycle()
     val balanceTestState by viewModel.balanceTestState.collectAsStateWithLifecycle()
     val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
@@ -719,6 +722,45 @@ fun ProviderEditorScreen(
                             Spacer(Modifier.width(Spacing.xs))
                             Text(stringResource(R.string.provider_fetch_models))
                         }
+                        if (batchTestState.running) {
+                            TextButton(
+                                onClick = { viewModel.stopAllModels() },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Icon(FeatherIcons.Square, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(Spacing.xs))
+                                Text(stringResource(R.string.provider_test_stop))
+                            }
+                        } else {
+                            TextButton(
+                                onClick = { viewModel.testAllModels(currentConfig()) },
+                                enabled = models.isNotEmpty(),
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            ) {
+                                Icon(FeatherIcons.Zap, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(Spacing.xs))
+                                Text(stringResource(R.string.provider_test_all))
+                            }
+                        }
+                    }
+                    if (batchTestState.running) {
+                        Text(
+                            text = stringResource(
+                                R.string.provider_test_batch_summary,
+                                batchTestState.done,
+                                batchTestState.total,
+                                batchTestState.success
+                            ),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = Spacing.md, end = Spacing.md, bottom = Spacing.xs)
+                        )
                     }
                     if (models.isEmpty()) {
                         Box(

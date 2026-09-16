@@ -98,8 +98,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -109,6 +114,15 @@ sealed class FetchState {
     data class Success(val models: List<String>, val debugInfo: ModelTestResult? = null) : FetchState()
     data class Error(val message: String, val debugInfo: ModelTestResult? = null) : FetchState()
 }
+
+/** 批量模型连通性测试进度：限并发 4，running=true 时可调 stopAllModels 取消。 */
+data class BatchTestState(
+    val providerId: String = "",
+    val total: Int = 0,
+    val done: Int = 0,
+    val success: Int = 0,
+    val running: Boolean = false,
+)
 
 /** 镜像下载页的完整 UI 状态：空闲 / 下载中（进度）/ 下载完成（可安装）/ 失败。 */
 sealed interface ContainerImageDownloadUiState {
@@ -514,6 +528,11 @@ class SettingsViewModel @Inject constructor(
 
     private val _testing = MutableStateFlow<Set<String>>(emptySet())
     val testing: StateFlow<Set<String>> = _testing.asStateFlow()
+
+    private val _batchTestState = MutableStateFlow(BatchTestState())
+    val batchTestState: StateFlow<BatchTestState> = _batchTestState.asStateFlow()
+
+    private var batchTestJob: Job? = null
 
     private val _balanceTestState = MutableStateFlow<ProviderBalanceState>(ProviderBalanceState.Idle)
     val balanceTestState: StateFlow<ProviderBalanceState> = _balanceTestState.asStateFlow()
@@ -1851,6 +1870,59 @@ class SettingsViewModel @Inject constructor(
     fun clearTestResults() {
         _testResults.value = emptyMap()
         _testing.value = emptySet()
+    }
+
+    /**
+     * 一键测试[provider]模型列表中的全部模型连通性，限并发 4：复用单测的
+     * [_testing]/[_testResults]，逐条实时反映到每行模型；running 时调 [stopAllModels] 取消。
+     */
+    fun testAllModels(provider: AIProviderConfig) {
+        if (batchTestJob?.isActive == true) return
+        val models = provider.models
+        if (models.isEmpty()) return
+        batchTestJob = viewModelScope.launch {
+            _batchTestState.value = BatchTestState(provider.id, models.size, 0, 0, true)
+            val semaphore = Semaphore(4)
+            try {
+                coroutineScope {
+                    models.map { model ->
+                        async {
+                            semaphore.withPermit {
+                                _testing.update { it + model }
+                                val result = modelApiService.testModel(
+                                    provider.baseUrl,
+                                    provider.firstUsableApiKey,
+                                    provider.type,
+                                    provider.useFullUrl,
+                                    provider.useResponseApi,
+                                    model,
+                                    provider.customHeaders,
+                                )
+                                _testResults.update { it + (model to result) }
+                                _testing.update { it - model }
+                                _batchTestState.update {
+                                    it.copy(
+                                        done = it.done + 1,
+                                        success = it.success + if (result.success) 1 else 0,
+                                    )
+                                }
+                            }
+                        }
+                    }.awaitAll()
+                }
+            } finally {
+                _batchTestState.update { it.copy(running = false) }
+                // 取消时正在跑的 OkHttp 阻塞调用不响应 cancel，清空残留 testing 标记兜底
+                _testing.value = emptySet()
+            }
+        }
+    }
+
+    fun stopAllModels() {
+        batchTestJob?.cancel()
+        batchTestJob = null
+        _testing.value = emptySet()
+        _batchTestState.update { it.copy(running = false) }
     }
 
     fun listAvailableBalanceScripts(): List<String> {
