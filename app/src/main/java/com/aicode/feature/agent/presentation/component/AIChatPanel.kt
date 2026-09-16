@@ -373,6 +373,12 @@ fun AIChatPanel(
     }
     val activeModel = activeProvider?.effectiveModel.orEmpty()
     val activeModelMetadata = modelMetadata[activeModel]
+    // 上下文占用 = 最近一次请求的 inputTokens（当前上下文窗口实际占用，非累计消耗）
+    val lastContextUsedTokens = remember(messages) {
+        messages.asReversed().firstOrNull {
+            it.role == MessageRole.ASSISTANT && it.inputTokens > 0
+        }?.inputTokens ?: 0
+    }
     val canUploadFiles = projectRoot.isNotBlank() && activeModelMetadata?.supportsTools == true
     val canUploadImages = projectRoot.isNotBlank()
     val reasoningEffort by viewModel.currentSessionReasoningEffort.collectAsStateWithLifecycle()
@@ -863,7 +869,9 @@ fun AIChatPanel(
                 connectionState = connectionState?.takeIf { isRemote },
                 showMenuButton = showMenuButton,
                 terminalActive = terminalActive,
-                gitActive = gitActive
+                gitActive = gitActive,
+                contextUsedTokens = lastContextUsedTokens,
+                contextMaxTokens = activeModelMetadata?.contextTokens ?: 0
             )
         }
     ) { padding ->

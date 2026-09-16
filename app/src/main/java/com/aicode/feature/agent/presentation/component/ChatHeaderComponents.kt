@@ -1,5 +1,6 @@
 package com.aicode.feature.agent.presentation.component
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,7 +68,9 @@ internal fun ChatHeader(
     connectionState: com.aicode.feature.agent.domain.container.ConnectionState? = null,
     showMenuButton: Boolean = true,
     terminalActive: Boolean = false,
-    gitActive: Boolean = false
+    gitActive: Boolean = false,
+    contextUsedTokens: Int = 0,
+    contextMaxTokens: Int = 0
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background
@@ -140,6 +148,12 @@ internal fun ChatHeader(
                     active = terminalActive,
                     onClick = onNavigateToTerminal
                 )
+                if (contextMaxTokens > 0) {
+                    ContextUsageCapsule(
+                        usedTokens = contextUsedTokens,
+                        maxTokens = contextMaxTokens
+                    )
+                }
             }
             // 远程模式：左边 SSH 连接状态，右边 token 累计统计
             if (connectionState != null) {
@@ -298,6 +312,71 @@ internal fun WelcomeState(modifier: Modifier = Modifier) {
                 text = stringResource(R.string.chat_input_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+/**
+ * 上下文占用胶囊：圆环进度（按占用率变色）+ 已用/最大 token 文本。
+ * 占用率 = 最近一次请求的 inputTokens / 模型 contextTokens（当前上下文窗口占用，非累计消耗）。
+ */
+@Composable
+private fun ContextUsageCapsule(usedTokens: Int, maxTokens: Int) {
+    val progress = if (maxTokens > 0) (usedTokens.toFloat() / maxTokens).coerceIn(0f, 1f) else 0f
+    val color = when {
+        progress >= 0.9f -> MaterialTheme.colorScheme.error
+        progress >= 0.7f -> Color(0xFFF59E0B)
+        else -> MaterialTheme.colorScheme.primary
+    }
+    val trackColor = MaterialTheme.colorScheme.surfaceVariant
+    Row(
+        modifier = Modifier
+            .background(trackColor.copy(alpha = 0.6f), RoundedCornerShape(Radius.pill))
+            .clip(RoundedCornerShape(Radius.pill))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+    ) {
+        ContextUsageRing(progress = progress, color = color, trackColor = trackColor, modifier = Modifier.size(16.dp))
+        Text(
+            text = "${formatTokenCount(usedTokens.toLong())}/${formatTokenCount(maxTokens.toLong())}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun ContextUsageRing(
+    progress: Float,
+    color: Color,
+    trackColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        val stroke = size.minDimension / 8f
+        val inset = stroke / 2f
+        val arcSize = Size(size.minDimension - stroke, size.minDimension - stroke)
+        drawArc(
+            color = trackColor,
+            startAngle = 0f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = Offset(inset, inset),
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round)
+        )
+        if (progress > 0f) {
+            drawArc(
+                color = color,
+                startAngle = -90f,
+                sweepAngle = 360f * progress,
+                useCenter = false,
+                topLeft = Offset(inset, inset),
+                size = arcSize,
+                style = Stroke(width = stroke, cap = StrokeCap.Round)
             )
         }
     }
