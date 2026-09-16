@@ -19,7 +19,7 @@ AiCode 是一款运行在 Android 手机上的 AI 编程工具，将大语言模
 - Android：minSdk 26，targetSdk 28（锁定，见下文「关键架构决策」），compileSdk 36
 
 **框架**
-- UI：Jetpack Compose（Material 3，BOM 2026.01.00）、Navigation Compose
+- UI：Jetpack Compose（Material 3，BOM 2026.01.00）、Navigation Compose、Kyant0/backdrop 1.0.6（液体玻璃材质：blur/lens/AGSL 水波折射，三档磨砂/水玻璃/液体玻璃）
 - 依赖注入：Hilt（Dagger 2.56.1）
 - 持久化：Room 2.7.1（主数据库 `aicode_agent_db`）+ DataStore Preferences（20+ 个分域设置仓库）
 - 网络：Retrofit 2.11 + OkHttp 4.12（LLM API）、sshj 0.38（SSH/SFTP）、commons-net + ftpserver-core（FTP 同步与内置 FTP 服务端）
@@ -120,7 +120,7 @@ project-root/
 
 **目的**：管理 AI Provider（多 Key 轮换、每提供商代理）、执行模式切换、主题语言等 20+ 分域设置。
 **位置**：`app/src/main/java/com/aicode/feature/settings/`
-**关键文件**：`data/local/entity/AIProviderEntity.kt`（Room）、`data/repository/ExecutionModeRepository.kt`（本地/远程模式）、`ExecutionModeHolder.kt`（模式内存缓存，三个委托层的分发依据）、`ProviderKeyRotator.kt`（Key 轮换）、`data/remote/UpdateCheckService.kt`（更新检查）
+**关键文件**：`data/local/entity/AIProviderEntity.kt`（Room）、`data/repository/ExecutionModeRepository.kt`（本地/远程模式）、`ExecutionModeHolder.kt`（模式内存缓存，三个委托层的分发依据）、`ProviderKeyRotator.kt`（Key 轮换）、`data/remote/ModelApiService.kt`（模型连通性测试，含限并发 4 的批量测试）、`data/repository/BackgroundSettingsRepository.kt`（背景图/磨砂/玻璃材质配置 6 键聚合）、`data/remote/UpdateCheckService.kt`（更新检查）
 **依赖**：Room（AgentDatabase 挂载其实体）
 **被依赖**：几乎所有 feature（拿配置与模式）
 
@@ -134,9 +134,9 @@ project-root/
 
 ### 6. 跨模块基础设施（core/ + di/）
 
-**目的**：数据库迁移加载、全局代理、主题、通用 UI 组件、日志；以及 app 层 Hilt 总装配。
+**目的**：数据库迁移加载、全局代理、主题、通用 UI 组件（含玻璃材质系统）、日志；以及 app 层 Hilt 总装配。
 **位置**：`app/src/main/java/com/aicode/core/`、`app/src/main/java/com/aicode/di/`
-**关键文件**：`core/db/MigrationLoader.kt`、`core/db/SqlScriptSplitter.kt`、`core/net/AppProxy.kt`、`core/util/FileLogger.kt`、`di/AgentModule.kt`（核心装配：数据库、Retrofit、ToolRegistry、委托绑定）
+**关键文件**：`core/db/MigrationLoader.kt`、`core/db/SqlScriptSplitter.kt`、`core/net/AppProxy.kt`、`core/ui/glass/GlassPanel.kt`（玻璃面板 Modifier：三档效果链+主题色染色+API33 门槛）、`core/util/FileLogger.kt`、`di/AgentModule.kt`（核心装配：数据库、Retrofit、ToolRegistry、委托绑定）
 **依赖**：无业务依赖（底层）
 **被依赖**：全部 feature
 
@@ -167,6 +167,16 @@ PRoot 需要在 App 可写目录执行二进制，Android 10+ 的 W^X / SELinux 
 ### flavor 按容器镜像拆包
 
 `universal`（arm64 + x86 两套 rootfs）/ `armsolo`（仅 arm）/ `x86solo`（仅 x86）三个 flavor 共享 sourceSet：`_armAssets`/`_x86Assets` 与 `_armJniLibs`/`_x86JniLibs` 各只放一份二进制，由 AGP 资源并集合并，单架构包体积约为通用包的一半。
+
+### 玻璃材质系统（磨砂 / 水玻璃 / 液体玻璃）
+
+基于 `io.github.kyant0:backdrop:1.0.6` 建立三档玻璃材质，全局作用于侧边栏、输入框、内容面板三区域：
+
+- **库版本锁定 1.0.6**：2.0+ 编译于 compileSdk 37，与项目 AGP 8.9.3（最高支持 SDK 36）冲突；1.0.6 编译于 SDK 36 兼容，API 表面（drawBackdrop/effects DSL/blur/lens/vibrancy）与 2.0 一致。1.0.6 无 `runtimeShaderEffect`，水玻璃档改用平台 `RenderEffect.createRuntimeShaderEffect` + 库 `effect()` 链入，与 2.0 语义等价。
+- **平台门槛 API 33+**：AGSL / RuntimeShader 需 Android 13，`glassPanel` Modifier 在 API < 33 直接透传、设置项禁用提示，不做降级。
+- **仅壁纸层采样**：壁纸 `Image` 标记为 backdrop 源（`rememberLayerBackdrop` 垫窗口底色 + `layerBackdrop`），静态录制一次零逐帧开销，不采样应用内容层（规避自反馈伪影）。
+- **配置零迁移**：6 个玻璃键（总开关/档位/三区域开关/水波动画）存入既有 `background_prefs`，复用 `frost_intensity`（0..1 × 32 = dp 半径）三档共用，无 Room 迁移。
+- **染色可读性**：`onDrawSurface` 画 `colorScheme.surface` 半透明层，alpha 下限 0.3；液体玻璃档额外 1dp 边缘高光描边。
 
 ## 图表
 

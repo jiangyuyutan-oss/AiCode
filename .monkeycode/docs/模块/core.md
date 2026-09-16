@@ -19,6 +19,10 @@ core/
 │   ├── SwipeToDeleteRow.kt / AppSwitch.kt / AppTextField.kt
 │   ├── ImageViewer.kt / ImageDecode.kt
 │   ├── ImeInset.kt / PageMotion.kt / WindowSize.kt
+│   └── glass/                  # 玻璃材质系统（三档磨砂/水玻璃/液体玻璃）
+│       ├── GlassMode.kt        # 枚举 + GlassSettings + LocalGlassSettings/LocalBackdrop
+│       ├── GlassPanel.kt       # glassPanel Modifier（三档效果链 + 染色 + API33 门槛）
+│       └── WaterWaveShader.kt  # 水波 AGSL（runtimeShaderEffect 经平台 RenderEffect 链入）
 └── util/
     ├── FileLogger.kt           # 落盘日志（按天分文件、等级阈值、7 天/5MB 清理）
     ├── AILogger.kt             # AI 请求/响应逐会话完整日志
@@ -34,6 +38,7 @@ core/
 | `db/SqlScriptSplitter.kt` | 状态机切分 SQL：识别 `--` / `/* */` 注释、单双引号/反引号字面量（含 `''` 转义）、`[...]` 标识符——字符串里的 `;` 不误切 |
 | `net/AppProxy.kt` | `applyGlobal` 在 `attachBaseContext` 设 JVM 全局 `ProxySelector` 与 `Authenticator`（OkHttp 407 显式认证）；容器内命令经 `proxyEnv` 注入 HTTP(S)_PROXY；支持 provider 级代理按 host 分派（配合 settings 的 `ProviderProxyRegistry`） |
 | `util/FileLogger.kt` | 外部私有目录按天分文件、单线程串行、等级阈值、自动清理 |
+| `ui/glass/GlassPanel.kt` | 玻璃面板 `Modifier.glassPanel(shape, area)`：按 `LocalGlassSettings` 档位组装效果链（磨砂 blur / 水玻璃 blur+AGSL 水波 / 液体玻璃 vibrancy+blur+lens 色散），`onDrawSurface` 主题色染色 alpha≥0.3，API<33 透传；backdrop 源从 `LocalBackdrop` 读（MainActivity 标记壁纸层） |
 
 ## 依赖
 

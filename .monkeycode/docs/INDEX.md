@@ -26,12 +26,12 @@ AI 工具系统（19 个内置工具 + 扩展点）、LLM Provider 适配（Open
 | `feature/agent/` | AI Agent 核心：workflow 状态机、工具系统、权限引擎、MCP、检查点、子代理 | [agent](./模块/agent.md) |
 | `feature/terminal/` | 终端会话（本地 PRoot / 远程 SSH 统一抽象）+ 进程保活 | [terminal](./模块/terminal.md) |
 | `feature/workspace/` | 工作区管理、文件访问后端、SAF Provider、SFTP/FTP 同步 | [workspace](./模块/workspace.md) |
-| `feature/settings/` | Provider 管理、执行模式、20+ 分域 DataStore 设置 | [settings](./模块/settings.md) |
+| `feature/settings/` | Provider 管理、执行模式、模型连通性批量测试、玻璃材质配置、20+ 分域 DataStore 设置 | [settings](./模块/settings.md) |
 | `feature/editor/` | sora-editor 封装、TextMate 语法高亮、编码检测 | [editor](./模块/editor.md) |
 | `feature/git/` | 容器内命令行 git 的可视化封装（状态/分支/历史/diff） | [git](./模块/git.md) |
 | `feature/backup/` | tar.gz + AES-GCM 加密备份恢复（流式） | [backup](./模块/backup.md) |
 | `feature/credentials/` | Git 凭据文件仓库与 helper 文件 IPC 桥 | [credentials](./模块/credentials.md) |
-| `core/` | 数据库迁移加载、全局代理、主题、通用组件、日志 | [core](./模块/core.md) |
+| `core/` | 数据库迁移加载、全局代理、主题、通用组件、玻璃材质系统、日志 | [core](./模块/core.md) |
 | `:terminal-emulator` / `:terminal-view` | Termux 派生终端模块（Java，Apache 2.0） | 见 [架构-项目结构](./ARCHITECTURE.md#项目结构) |
 
 `feature/onboarding/`（首启 spotlight 引导）体量小、自包含：`domain/OnboardingStep.kt` 定义 10 步流程，`OnboardingCoordinator` 桥接状态机与 DataStore 持久化，UI 侧 `OnboardingOverlay` + `SpotlightOverlay` 实现挖孔高亮。
