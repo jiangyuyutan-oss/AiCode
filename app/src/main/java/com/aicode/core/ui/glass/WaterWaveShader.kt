@@ -21,6 +21,6 @@ const val WATER_WAVE_SHADER: String = """
         float dx = sin(coord.y * 0.02 + t * 1.3) + 0.5 * sin(coord.y * 0.045 - t * 0.7);
         float dy = cos(coord.x * 0.02 + t * 1.1) + 0.5 * cos(coord.x * 0.045 - t * 0.9);
         float2 offset = float2(dx, dy) * uAmplitude;
-        return sample(uContent, coord + offset);
+        return uContent.eval(coord + offset);
     }
 """
