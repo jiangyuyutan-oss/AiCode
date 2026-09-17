@@ -257,6 +257,9 @@ fun AIChatPanel(
     selectedCode: String? = null,
     onboardingStep: OnboardingStep? = null,
     onSelectModelInOnboarding: (() -> Unit)? = null,
+    /** 外部分享注入的图片 Uri，由 [handlePickedAttachments] 消费后清空。 */
+    pendingShareImages: List<Uri> = emptyList(),
+    onShareImagesConsumed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val agentState by viewModel.agentState.collectAsStateWithLifecycle()
@@ -556,6 +559,14 @@ fun AIChatPanel(
                 else ->
                     Toast.makeText(context, uploadSuccessMessage(context, successCount), Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    // 外部分享注入的图片：走与 picker 相同的 handlePickedAttachments 链路，消费后通知清空中转站。
+    LaunchedEffect(pendingShareImages) {
+        if (pendingShareImages.isNotEmpty()) {
+            handlePickedAttachments(pendingShareImages, images = true)
+            onShareImagesConsumed()
         }
     }
 

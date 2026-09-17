@@ -2,6 +2,7 @@ package com.aicode
 
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,6 +66,7 @@ import androidx.navigation.navArgument
 import com.aicode.core.theme.AIEditorTheme
 import com.aicode.core.theme.AppThemePreset
 import com.aicode.core.ui.PAGE_MOTION_MS
+import com.aicode.core.ui.SharePayloadHolder
 import com.aicode.core.ui.VerticalSplitHandle
 import com.aicode.core.ui.drawerWidth
 import com.aicode.core.ui.isExpandedWidth
@@ -74,6 +76,7 @@ import com.aicode.core.ui.glass.glassPanel
 import com.aicode.core.ui.glass.isEnabled
 import com.aicode.core.ui.pageEnter
 import com.aicode.core.ui.pageExit
+import com.aicode.core.ui.parseShareIntent
 import com.aicode.core.ui.glass.GlassSettings
 import com.aicode.core.ui.glass.LocalBackdrop
 import com.aicode.core.ui.glass.LocalGlassSettings
@@ -213,6 +216,8 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 30) {
             window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
         }
+        // 冷启动由分享菜单拉起时，Intent 带 ACTION_SEND；解析后写入中转站，setContent 内的 AppNavigation 会消费。
+        handleShareIntent(intent)
         setContent {
             val themeMode by themeSettings.themeModeFlow.collectAsStateWithLifecycle(initialValue = AppThemeMode.AUTO)
             val themePresetId by themeSettings.themePresetIdFlow.collectAsStateWithLifecycle(initialValue = null)
@@ -313,6 +318,18 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleShareIntent(intent)
+    }
+
+    /** 解析 ACTION_SEND 分享 Intent，写入 [SharePayloadHolder] 供 AppNavigation 消费。 */
+    private fun handleShareIntent(intent: Intent?) {
+        val payload = parseShareIntent(intent ?: return) ?: return
+        SharePayloadHolder.set(payload)
+    }
+
 }
 
 /** 大屏右栏默认占宽比，以及拖拽分栏的上下限——两边都至少留 30% 宽度。 */
@@ -355,6 +372,20 @@ fun AppNavigation(
     val agentViewModel: AIAgentViewModel = hiltViewModel()
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val workspaceViewModel: WorkspaceViewModel = hiltViewModel()
+
+    // 接收外部分享：文本追加到当前会话输入框，图片交由 AIChatPanel 经其图片入参消费。
+    val sharePayload by SharePayloadHolder.payload.collectAsStateWithLifecycle(initialValue = null)
+    LaunchedEffect(sharePayload) {
+        val payload = sharePayload ?: return@LaunchedEffect
+        if (agentViewModel.currentSessionId.value == null) agentViewModel.newSession()
+        val text = payload.text
+        if (!text.isNullOrBlank()) {
+            val cur = agentViewModel.inputDraft.value
+            agentViewModel.updateInputDraft(if (cur.isBlank()) text else "$cur\n\n$text")
+        }
+        // 图片由 AIChatPanel 的 pendingShareImages 入参消费；无图片时直接清空中转站。
+        if (payload.imageUris.isEmpty()) SharePayloadHolder.consume()
+    }
 
     // 玻璃材质：侧栏/输入框/内容面板按区域开关短路，glassPanel 内部再兜底总开关与 API33 门槛。
     val glass = LocalGlassSettings.current
@@ -609,7 +640,9 @@ fun AppNavigation(
                                     if (onboardingUiState.active && onboardingUiState.step == OnboardingStep.SIMULATE_CHOOSE_MODEL) {
                                         onboardingCoordinator.nextStep()
                                     }
-                                }
+                                },
+                                pendingShareImages = sharePayload?.imageUris.orEmpty(),
+                                onShareImagesConsumed = { SharePayloadHolder.consume() }
                             )
                         }
                     }
