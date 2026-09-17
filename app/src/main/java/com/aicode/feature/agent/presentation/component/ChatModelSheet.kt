@@ -1,6 +1,7 @@
 package com.aicode.feature.agent.presentation.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +16,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -27,8 +29,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import com.aicode.R
 import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
@@ -127,45 +131,58 @@ internal fun ReasoningEffortSelector(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = Spacing.sm)
+                    modifier = Modifier.padding(bottom = Spacing.md)
                 )
-                availableEfforts.forEach { e ->
-                    val selected = e == effort
+                // 当前档位大字（ChatGPT 风格：滑块上方突出显示选中档位）
+                Text(
+                    text = stringResource(effort.labelRes()),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = Spacing.md)
+                )
+                val n = availableEfforts.size
+                if (n > 1) {
+                    val selectedIndex = availableEfforts.indexOf(effort).coerceIn(0, n - 1)
+                    Slider(
+                        value = selectedIndex.toFloat(),
+                        onValueChange = { v ->
+                            val idx = v.roundToInt().coerceIn(0, n - 1)
+                            if (idx != selectedIndex) {
+                                onChange(availableEfforts[idx])
+                            }
+                        },
+                        valueRange = 0f..(n - 1).toFloat(),
+                        steps = (n - 2).coerceAtLeast(0),
+                        enabled = enabled,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    // 档位标签行：均匀分布，当前档位高亮
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(Radius.sm))
-                            .clickable {
-                                showSheet = false
-                                onChange(e)
-                            }
-                            .padding(horizontal = Spacing.md, vertical = Spacing.md),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(top = Spacing.xs),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        Icon(
-                            FeatherIcons.Zap,
-                            contentDescription = null,
-                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(Spacing.md))
-                        Text(
-                            text = stringResource(e.labelRes()),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (selected) {
-                            Icon(
-                                FeatherIcons.Check,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                        availableEfforts.forEach { e ->
+                            Text(
+                                text = stringResource(e.labelRes()),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (e == effort) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                     }
+                } else {
+                    // 仅一档可用：不显示滑块，只提示档位名
+                    Text(
+                        text = stringResource(availableEfforts.firstOrNull()?.labelRes() ?: effort.labelRes()),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
