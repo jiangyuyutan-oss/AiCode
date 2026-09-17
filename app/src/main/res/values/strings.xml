@@ -1392,4 +1392,9 @@
     <string name="settings_target_max_consecutive_failures">连续失败阈值</string>
     <string name="mode_target_status_steps">步数 %1$d</string>
     <string name="mode_target_status_fails">连续失败 %1$d</string>
+
+    <!-- 接收外部分享 -->
+    <string name="share_text_truncated">分享内容过长，已截取前 %1$d 字符</string>
+    <string name="share_image_load_failed">部分图片加载失败，仅注入有效内容</string>
+    <string name="share_empty_content">未接收到有效内容</string>
 </resources>

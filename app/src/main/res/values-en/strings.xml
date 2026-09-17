@@ -1393,4 +1393,9 @@
     <string name="settings_target_max_consecutive_failures">Max consecutive failures</string>
     <string name="mode_target_status_steps">Steps %1$d</string>
     <string name="mode_target_status_fails">Consecutive failures %1$d</string>
+
+    <!-- Received external share -->
+    <string name="share_text_truncated">Shared content too long, kept first %1$d characters</string>
+    <string name="share_image_load_failed">Some images failed to load, only valid content injected</string>
+    <string name="share_empty_content">No valid content received</string>
 </resources>
