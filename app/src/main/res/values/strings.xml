@@ -1397,4 +1397,12 @@
     <string name="share_text_truncated">分享内容过长，已截取前 %1$d 字符</string>
     <string name="share_image_load_failed">部分图片加载失败，仅注入有效内容</string>
     <string name="share_empty_content">未接收到有效内容</string>
+
+    <!-- 语音听写 -->
+    <string name="chat_voice_input">语音输入</string>
+    <string name="chat_voice_listening">正在听写，点击停止</string>
+    <string name="chat_voice_permission_denied">需要麦克风权限才能语音输入</string>
+    <string name="chat_voice_unavailable">当前设备不支持语音识别</string>
+    <string name="chat_voice_no_match">未听清，请再试一次</string>
+    <string name="chat_voice_error">语音识别失败</string>
 </resources>

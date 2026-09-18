@@ -112,6 +112,7 @@ export default defineConfig({
           items: [
             { text: '聊天界面导览', link: '/guide/chat' },
             { text: '接收外部分享', link: '/guide/share' },
+            { text: '语音输入', link: '/guide/voice-input' },
             { text: '三种模式（Build / Plan / Auto）', link: '/guide/modes' },
             { text: '检查点与撤销', link: '/guide/checkpoint' },
             { text: '终端', link: '/guide/terminal' },
