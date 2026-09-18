@@ -37,6 +37,7 @@ import com.aicode.feature.agent.domain.tool.container.ExecuteCommandTool
 import com.aicode.feature.agent.domain.tool.container.TerminalSessionTool
 import com.aicode.feature.agent.domain.tool.explorer.ListFilesTool
 import com.aicode.feature.agent.domain.tool.explorer.SearchCodeTool
+import com.aicode.feature.agent.domain.tool.semantic.SemanticSearchTool
 import com.aicode.feature.agent.domain.tool.skill.LoadSkillTool
 import com.aicode.feature.agent.domain.tool.question.AskUserQuestionTool
 import com.aicode.feature.agent.domain.tool.todo.TodoTool
@@ -273,6 +274,7 @@ object AgentModule {
         terminalSessionTool: TerminalSessionTool,
         listFilesTool: ListFilesTool,
         searchCodeTool: SearchCodeTool,
+        semanticSearchTool: SemanticSearchTool,
         loadSkillTool: LoadSkillTool,
         askUserQuestionTool: AskUserQuestionTool,
         manageMcpTool: ManageMcpTool,
@@ -295,6 +297,7 @@ object AgentModule {
             register("terminal", terminalSessionTool)
             register("list", listFilesTool)
             register("search", searchCodeTool)
+            register("semantic_search", semanticSearchTool)
             register("loadSkill", loadSkillTool)
             register("askUserQuestion", askUserQuestionTool)
             register("manageMcp", manageMcpTool)
