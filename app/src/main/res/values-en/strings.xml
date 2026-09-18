@@ -766,6 +766,17 @@
     <string name="git_pull_dirty_confirm">The working tree has uncommitted changes. Pulling may cause conflicts. Commit or stage them first if possible. Continue pulling?</string>
     <string name="git_pull_continue">Continue Pull</string>
 
+    <!-- Git branch merge / rebase -->
+    <string name="git_action_merge">Merge</string>
+    <string name="git_action_rebase">Rebase</string>
+    <string name="git_action_abort">Abort</string>
+    <string name="git_action_continue_rebase">Continue Rebase</string>
+    <string name="git_merge_confirm_message">Merge %1$s into current branch %2$s? Merge or rebase.</string>
+    <string name="git_merge_conflict_banner_title">Merge conflict</string>
+    <string name="git_rebase_conflict_banner_title">Rebase conflict</string>
+    <string name="git_conflict_files">%1$d conflicted files</string>
+    <string name="git_conflict_hint_terminal">Resolve conflicts manually in the workspace terminal, then tap "Continue" to finish</string>
+
     <!-- Git Toast Messages -->
     <string name="git_toast_load_branches_failed">Failed to load branches: %1$s</string>
     <string name="git_toast_refresh_failed">Refresh failed: %1$s</string>

@@ -405,6 +405,38 @@ class GitRepository @Inject constructor(
     /** 本地标签列表，按创建时间倒序（最新在前）。 */
     suspend fun listTags(): List<GitTag> = loadAllRefs().tags
 
+    // ── 分支合并 / 变基 ──
+
+    /** 把 [branch] 合并进当前分支（fast-forward 时自动快进）。`core.editor=true` 让冲突解决后的合并提交不弹编辑器直接沿用默认消息。 */
+    suspend fun merge(branch: String): String =
+        gitChecked("-c", "core.editor=true", "merge", branch)
+
+    /** 把当前分支变基到 [branch]。rebase 递归或 conflict 时 non-zero 退出码由 [gitChecked] 抛异常。 */
+    suspend fun rebase(branch: String): String =
+        gitChecked("-c", "core.editor=true", "rebase", branch)
+
+    suspend fun abortMerge(): String = gitChecked("merge", "--abort")
+
+    suspend fun abortRebase(): String = gitChecked("rebase", "--abort")
+
+    /** 冲突解决并 stage 后继续变基。同样以 `true` 作为 editor，避免打开交互编辑器卡住。 */
+    suspend fun continueRebase(): String =
+        gitChecked("-c", "core.editor=true", "rebase", "--continue")
+
+    /** 是否处于合并中（工作区存在 MERGE_HEAD）。 */
+    suspend fun isMerging(): Boolean =
+        git("rev-parse", "-q", "--verify", "MERGE_HEAD").isNotBlank()
+
+    /** 是否处于变基中（工作区存在 REBASE_HEAD，interactive 目录 rebase-merge 同样暴露该引用）。 */
+    suspend fun isRebasing(): Boolean =
+        git("rev-parse", "-q", "--verify", "REBASE_HEAD").isNotBlank()
+
+    /** 当前合并/变基冲突的未解决文件路径列表（porcelain v1 两列都非空白的冲突状态码，如 UU/AA/DD/UD/AU）。 */
+    suspend fun mergeConflicts(): List<String> {
+        val raw = git("status", "--porcelain=v1")
+        return mergeConflictsFromPorcelain(raw)
+    }
+
     /**
      * 创建新分支。name 为新分支名；startPoint 为基准分支名（null/空 → 从当前 HEAD）；
      * checkout=true 则创建并切换（`git checkout -b`），否则仅创建不切换（`git branch`）。
@@ -625,4 +657,24 @@ internal fun unquoteGitPath(raw: String): String {
         }
     }
     return sb.toString()
+}
+
+/**
+ * 从 `git status --porcelain=v1` 输出解析未解决的冲突文件路径（纯函数，可单测）。
+ * 冲突状态码两列都为字母（非空格/问号）：UU / AA / DD / AU / UA / UD / DU。
+ */
+internal fun mergeConflictsFromPorcelain(porcelain: String): List<String> {
+    val conflicts = mutableListOf<String>()
+    porcelain.split('\n').forEach { line ->
+        val trimmed = line.removeSuffix("\r")
+        if (trimmed.length < 3) return@forEach
+        val x = trimmed[0]
+        val y = trimmed[1]
+        val isUnmerged = x in "UAD" && y in "UAD"
+        if (isUnmerged) {
+            val path = trimmed.substring(3).substringAfter(" -> ").trim().trim('"')
+            if (path.isNotEmpty()) conflicts.add(path)
+        }
+    }
+    return conflicts
 }
