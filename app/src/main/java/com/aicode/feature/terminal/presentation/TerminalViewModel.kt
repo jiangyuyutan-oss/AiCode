@@ -45,6 +45,9 @@ class TerminalViewModel @Inject constructor(
 
     private fun isRemote() = modeHolder.currentMode() == ExecutionMode.REMOTE_SSH
 
+    /** 当前是否为远程 SSH 后端（本地容器服务的端口预览仅在本地模式可用）。 */
+    fun isRemoteMode(): Boolean = isRemote()
+
     /** 容器准备阶段的整体状态：仅用于首个标签创建前的 Loading/Error 提示。 */
     sealed interface PrepareState {
         data object Loading : PrepareState

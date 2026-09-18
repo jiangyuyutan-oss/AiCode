@@ -1180,6 +1180,16 @@
     <string name="terminal_preparing_env_failed">Preparing container environment…\n%1$s</string>
     <string name="terminal_preparing_env_first_run">Preparing container environment…\nFirst run will extract the container, please wait</string>
 
+    <!-- Terminal Web Preview -->
+    <string name="terminal_preview">Preview</string>
+    <string name="terminal_preview_remote_unavailable">Preview is only available in local container mode</string>
+    <string name="terminal_preview_dialog_title">Open container web service</string>
+    <string name="terminal_preview_dialog_hint">Enter the port of a running service in the container (e.g. python -m http.server 3000). Preview opens http://127.0.0.1:port</string>
+    <string name="terminal_preview_port_hint">Port</string>
+    <string name="terminal_preview_open">Open</string>
+    <string name="terminal_preview_reload">Reload</string>
+    <string name="terminal_preview_external">Open in browser</string>
+
     <!-- Terminal Settings & Themes -->
     <string name="terminal_settings_title">Terminal Settings</string>
     <string name="terminal_theme_title">Color Theme</string>

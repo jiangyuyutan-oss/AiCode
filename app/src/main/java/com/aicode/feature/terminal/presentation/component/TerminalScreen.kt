@@ -2,6 +2,7 @@ package com.aicode.feature.terminal.presentation.component
 
 import android.content.Context
 import android.graphics.Typeface
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -78,6 +79,7 @@ import com.termux.terminal.TextStyle
 import com.termux.view.TerminalView
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowLeft
+import compose.icons.feathericons.Monitor
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Settings
 import compose.icons.feathericons.X
@@ -100,6 +102,7 @@ fun TerminalScreen(
     val revision by viewModel.revision.collectAsStateWithLifecycle()
     val terminalSettings by viewModel.terminalSettings.collectAsStateWithLifecycle()
     var showSettingsSheet by remember { mutableStateOf(false) }
+    var showPreviewDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -122,6 +125,19 @@ fun TerminalScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        if (viewModel.isRemoteMode()) {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.terminal_preview_remote_unavailable),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            showPreviewDialog = true
+                        }
+                    }) {
+                        Icon(FeatherIcons.Monitor, contentDescription = stringResource(R.string.terminal_preview))
+                    }
                     IconButton(onClick = { showSettingsSheet = true }) {
                         Icon(FeatherIcons.Settings, contentDescription = stringResource(R.string.terminal_settings_title))
                     }
@@ -194,6 +210,12 @@ fun TerminalScreen(
                 onChangeFontSize = { viewModel.setFontSize(it) },
                 onChangeCursorStyle = { viewModel.setCursorStyle(it) },
                 onChangeFontPath = { viewModel.setFontPath(it) }
+            )
+        }
+
+        if (showPreviewDialog) {
+            ContainerPreviewDialog(
+                onDismiss = { showPreviewDialog = false }
             )
         }
     }
