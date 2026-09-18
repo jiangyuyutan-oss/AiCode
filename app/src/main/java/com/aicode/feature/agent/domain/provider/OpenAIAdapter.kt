@@ -55,6 +55,7 @@ class OpenAIAdapter @Inject constructor(
 
     // OpenAI 系不发输出上限参数（用服务端默认），仅为接口完整性保留。
     override var maxOutputTokens: Int? = null
+    override var requiresReasoningEcho: Boolean = false
 
     // null 时请求体不带 temperature（Gson 跳过 null 字段），交由服务端默认。
     override var temperature: Float? = null
@@ -172,7 +173,7 @@ class OpenAIAdapter @Inject constructor(
         reasoningEffort: String?,
         stream: Boolean
     ): Map<String, Any?> {
-        val isDeepSeek = model.contains("deepseek", ignoreCase = true)
+        val reasoningEcho = requiresReasoningEcho || model.contains("deepseek", ignoreCase = true)
         val request = mutableMapOf<String, Any?>(
             "model" to model,
             "input" to buildResponsesInput(
@@ -181,7 +182,7 @@ class OpenAIAdapter @Inject constructor(
                 messages = messages,
                 // DeepSeek 思考模式：带 tools 的请求必须把历史每轮的思考内容回传（同 Chat
                 // Completions 那边的 reasoning_content）；官方/通用路径在存有合法快照时也会自动回传。
-                includeReasoningItems = isDeepSeek
+                includeReasoningItems = reasoningEcho
             )
         )
         buildResponsesTools(tools)?.let {
@@ -190,7 +191,7 @@ class OpenAIAdapter @Inject constructor(
         }
         if (stream) request["stream"] = true
         normalizeReasoningEffort(reasoningEffort)?.let { effort ->
-            if (isDeepSeek) {
+            if (model.contains("deepseek", ignoreCase = true)) {
                 request["reasoning"] = mapOf("effort" to effort)
             } else {
                 // OpenAI 官方/通用 Responses 规范：显式开启思考总结（summary: "auto"），
@@ -553,8 +554,14 @@ class OpenAIAdapter @Inject constructor(
                         message.toolCalls.map { convertToOpenAIToolCall(it) }
                     } else null
                     // DeepSeek 思考模式要求 assistant 消息的 reasoning_content 字段必须存在
-                    // （即使是空串也要带上），否则工具调用轮回传时 API 报 400。
-                    val reasoningContent = if (model.contains("deepseek", ignoreCase = true)) {
+                    // （即使是空串也要带上），否则工具调用轮回传时 API 报 400，并行调多个工具恰是最容易
+                    // 踩中的场景——只要带 tools 请求里任一 assistant 轮缺该字段就 400。
+                    // 判定由工作流注入的 [requiresReasoningEcho]（模型元数据 supportsReasoning）驱动，
+                    // 不依赖模型名前缀：中转 / 自定义别名改名后 model 未必含 "deepseek"。
+                    // 兜底：本轮携带工具调用时也强制输出该字段（空串占位），因为推理模型带工具继续
+                    // 的轮次必然需要回传思考内容。
+                    val carriesToolCalls = message.toolCalls.isNotEmpty()
+                    val reasoningContent = if (requiresReasoningEcho && (message.reasoning.isNotEmpty() || carriesToolCalls)) {
                         message.reasoning
                     } else {
                         message.reasoning.ifEmpty { null }
@@ -571,17 +578,20 @@ class OpenAIAdapter @Inject constructor(
                     val modelText = message.modelResult
                         ?: modelToolResultText(message.toolName, message.result)
                         ?: message.result
+                    // 空工具结果用占位，避免发出 `"content": ""`——部分兼容服务（含 DeepSeek）对
+                    // 空 content 的工具消息校验偏严，并行多工具下偶发 400。
+                    val safeText = modelText.ifBlank { "（空结果）" }
                     val content: Any = if (message.images.isNotEmpty()) {
                         val parts = mutableListOf<Map<String, Any>>()
-                        if (modelText.isNotBlank()) {
-                            parts.add(mapOf("type" to "text", "text" to modelText))
+                        if (safeText.isNotBlank()) {
+                            parts.add(mapOf("type" to "text", "text" to safeText))
                         }
                         message.images.forEach { image ->
                             parts.add(image.toOpenAIImagePart())
                         }
                         parts
                     } else {
-                        modelText
+                        safeText
                     }
                     OpenAIChatMessage(
                         role = "tool",

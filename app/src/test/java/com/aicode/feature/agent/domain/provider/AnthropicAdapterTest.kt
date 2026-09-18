@@ -93,15 +93,18 @@ class AnthropicAdapterTest {
     @Test
     fun max_tokens_leaves_room_for_content_above_thinking_budget() = runTest {
         val api = FakeApi(response())
-        // 元数据上限比思考预算还小时不能直接用：max_tokens 必须大于 budget_tokens，否则服务端 400。
+        // 元数据上限比思考预算还小时：max_tokens 必须 > budget_tokens（否则 400），且不得超过模型
+        // 上限（否则也 400）。因此把预算 clamp 到上限之下：正文至少留出 min(4096, 上限/2)。
         adapter(api, maxOutput = 2048).complete(
             "sys",
             listOf(AgentMessage.UserMessage(content = "hi")),
             reasoningEffort = "high"
         )
 
-        assertEquals(8192, api.lastRequest?.thinking?.budget_tokens)
-        assertEquals(8192 + 4096, api.lastRequest?.max_tokens)
+        // contentRoom = min(4096, 2048/2=1024) = 1024；maxBudget = 2048-1024 = 1024；
+        // budget = min(8192, 1024) = 1024（clamp 进请求体）；max_tokens = 1024+1024 = 2048，恰好等于模型上限。
+        assertEquals(1024, api.lastRequest?.thinking?.budget_tokens)
+        assertEquals(2048, api.lastRequest?.max_tokens)
     }
 
     @Test

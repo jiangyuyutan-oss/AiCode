@@ -137,6 +137,14 @@ interface AIProvider {
     var maxOutputTokens: Int?
 
     /**
+     * 本轮是否要求「带工具调用时把历史 assistant 消息的 reasoning_content 无条件回传（含空串占位）」。
+     * DeepSeek 思考模式在请求带 tools 时必须把每轮思考内容原样回传，否则并行调多个工具 / 任一
+     * 轮次思考为空时 API 报 400。由工作流按模型元数据 [ModelMetadata.supportsReasoning] 设置；
+     * 独立于模型名前缀（中转 / 自定义别名改名后 model 未必含 "deepseek"）。
+     */
+    var requiresReasoningEcho: Boolean
+
+    /**
      * 本次请求的采样温度，调用前由工作流按模型元数据设置（见 [fixedTemperature]）。
      * null 表示请求里不带该字段、用服务端默认——服务端把温度固定住的模型（kimi-k3、gpt-5 系等）
      * 带上任何值都会 400。

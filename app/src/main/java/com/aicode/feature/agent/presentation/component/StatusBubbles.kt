@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -303,6 +304,21 @@ internal fun rememberTypewriterStreamingText(
         shownHead = streamHeadFingerprint(snapshot)
     }
 
+    // 切页离开组合时，把「离开这一刻已到达的完整文本」记进 saveable，而不是只记节流快照长度。
+    // 否则返回后 showChars 还停留在离开瞬间的碎片，把离开期间新到达的整段内容当着用户面逐字重打
+    // （复现路径：AI 持续吐字时切去设置/终端，回来看到从头打字）。返回时 restored 恢复为离开时刻
+    // 的完整前缀，仅对返回后真正新增的 delta 走帧循环。
+    val latestTextForDispose by rememberUpdatedState(text)
+    DisposableEffect(sessionKey) {
+        onDispose {
+            // 仅当组合还在持续流式（active）时记录；文本已结束的直接补全，无需记忆。
+            if (latestTextForDispose.isNotEmpty()) {
+                shownChars = latestTextForDispose.length
+                shownHead = streamHeadFingerprint(latestTextForDispose)
+            }
+        }
+    }
+
     LaunchedEffect(text, active, sessionKey) {
         // 文本不是当前进度的延续（换会话 / 新一轮 / 重试）：补全到当前全文，再跟着后续 delta 打字。
         // 不能归零重打——切到另一个正在输出的会话时，它已产出的几百字会当着用户的面再来一遍。
@@ -454,8 +470,16 @@ internal fun ReasoningBubble(
     var timerStartMillis by rememberSaveable { mutableStateOf(0L) }
     var timerSeenChars by rememberSaveable { mutableStateOf(0) }
     var timerSeenHead by rememberSaveable { mutableStateOf(0) }
-    var elapsedSeconds by remember { mutableStateOf(0) }
+    // 切页返回 / 移出视口重挂载时，首帧就按「离开前保存的绝对起点」算出真实已计秒数，
+    // 避免每 1s 重置首帧显示 0s、再靠 ticker 碰一下纠正的闪烁。起点无效（首次出现）时为 0。
     val latestText by rememberUpdatedState(text)
+    var elapsedSeconds by remember {
+        mutableStateOf(
+            if (showTimer && timerStartMillis > 0L) {
+                ((System.currentTimeMillis() - timerStartMillis) / 1000L).toInt()
+            } else 0
+        )
+    }
     LaunchedEffect(showTimer, sessionKey) {
         if (!showTimer) return@LaunchedEffect
         if (!isStreamContinuation(latestText, timerSeenChars, timerSeenHead)) {

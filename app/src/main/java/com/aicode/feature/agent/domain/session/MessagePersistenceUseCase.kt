@@ -264,7 +264,10 @@ class MessagePersistenceUseCase @Inject constructor(
                     val imageAttachments = e.attachmentsJson?.let {
                         runCatching { json.decodeFromString<List<AgentAttachment>>(it) }.getOrNull()
                     }.orEmpty()
-                    if (e.content.isNotBlank() || toolCalls.isNotEmpty() || imageAttachments.isNotEmpty()) {
+                    // 纯思考轮（content 空、无 tool_calls、无图片，只有 reasoning）也要保留：DeepSeek 思考模式的
+                    // 历史回传要求 reasoning_content 逐轮原样带上，丢弃会断思考链、且让带 tools 的后续
+                    // 请求缺 reason 字段触发 400（见 OpenAIAdapter 判据）。
+                    if (e.content.isNotBlank() || toolCalls.isNotEmpty() || imageAttachments.isNotEmpty() || !e.reasoning.isNullOrBlank()) {
                         val previous = result.lastOrNull()
                         if (
                             e.isContextSummary &&

@@ -51,6 +51,7 @@ class AnthropicAdapter @Inject constructor(
     override var customHeaders: Map<String, String> = emptyMap()
 
     override var maxOutputTokens: Int? = null
+    override var requiresReasoningEcho: Boolean = false
 
     // null 时请求体不带 temperature（Gson 跳过 null 字段），交由服务端默认；开启 thinking 时官方要求必须不带。
     override var temperature: Float? = null
@@ -78,13 +79,14 @@ class AnthropicAdapter @Inject constructor(
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.ANTHROPIC))
         val (thinking, outputConfig) = buildThinkingConfig(reasoningEffort)
+        val (maxTokens, resolvedThinking) = resolveMaxTokensBudget(thinking)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
             system = buildSystemPayload(systemPrompt),
-            max_tokens = resolveMaxTokens(thinking),
+            max_tokens = maxTokens,
             temperature = if (thinking != null) null else temperature,
-            thinking = thinking,
+            thinking = resolvedThinking,
             output_config = outputConfig,
             tools = toolDefs,
             stream = false
@@ -154,13 +156,14 @@ class AnthropicAdapter @Inject constructor(
 
         val url = if (useFullUrl) baseUrl else joinUrl(baseUrl, defaultProviderApiPath(ProviderType.ANTHROPIC))
         val (thinking, outputConfig) = buildThinkingConfig(reasoningEffort)
+        val (maxTokens, resolvedThinking) = resolveMaxTokensBudget(thinking)
         val request = AnthropicMessageRequest(
             model = model,
             messages = anthropicMessages,
             system = buildSystemPayload(systemPrompt),
-            max_tokens = resolveMaxTokens(thinking),
+            max_tokens = maxTokens,
             temperature = if (thinking != null) null else temperature,
-            thinking = thinking,
+            thinking = resolvedThinking,
             output_config = outputConfig,
             tools = toolDefs,
             stream = true
@@ -365,13 +368,26 @@ class AnthropicAdapter @Inject constructor(
     }
 
     /**
-     * 最大输出 token：优先用模型元数据的输出上限，缺失时回退 [DEFAULT_MAX_TOKENS]。
-     * 开启 thinking 时思考预算计入 max_tokens，须留出正文空间，故不得低于预算 + [MIN_CONTENT_TOKENS]。
+     * 求解「max_tokens 与 thinking.budget_tokens」的兼容取值。
+     *
+     * 两个硬约束（违反任一都会被官方 400）：
+     * 1. budget_tokens ≥ 1024 且 < max_tokens（官方要求预算必须严格小于输出上限）；
+     * 2. max_tokens ≤ 模型真实输出上限（小上限模型如 haiku 系 8192 配高预算档，旧逻辑把 max_tokens
+     *    抬到 12288 直接超上限 400）。
+     *
+     * 因此正文空间取 [MIN_CONTENT_TOKENS] 与上限一半的较小者，预算 clamp 到「上限 - 正文空间」
+     * 以内（且 ≥ [MIN_BUDGET_TOKENS]），最终 max_tokens = 预算 + 正文空间，恒 ≤ 上限，
+     * 且 budget < max_tokens 恒成立。第二元返回 clamp 后的预算（新否，原样放回请求体。
      */
-    private fun resolveMaxTokens(thinking: AnthropicThinkingConfig?): Int {
+    private fun resolveMaxTokensBudget(thinking: AnthropicThinkingConfig?): Pair<Int, AnthropicThinkingConfig?> {
         val limit = maxOutputTokens?.takeIf { it > 0 } ?: DEFAULT_MAX_TOKENS
-        val budget = thinking?.budget_tokens ?: return limit
-        return maxOf(limit, budget + MIN_CONTENT_TOKENS)
+        val budget = thinking?.budget_tokens ?: return limit to thinking
+        val contentRoom = MIN_CONTENT_TOKENS.coerceAtMost(limit / 2)
+        val maxBudget = (limit - contentRoom).coerceAtLeast(MIN_BUDGET_TOKENS)
+        val budgetClamped = budget.coerceIn(MIN_BUDGET_TOKENS, maxBudget)
+        val maxTokens = (budgetClamped + contentRoom).coerceAtMost(limit)
+        val clampedThinking = if (budgetClamped == budget) thinking else thinking?.copy(budget_tokens = budgetClamped)
+        return maxTokens to clampedThinking
     }
 
     /** thinking / redacted_thinking 块原样序列化为快照；无块时 null。 */
@@ -438,7 +454,21 @@ class AnthropicAdapter @Inject constructor(
         for (message in messages) {
             when (message) {
                 is AgentMessage.UserMessage -> {
-                    result.add(AnthropicMessage(role = "user", content = message.toAnthropicUserContent()))
+                    // 连续 user 消息通用合并：严格网关（不自动合并连续同角色轮的实现）对连续 user 会直接
+                    // 400。官方端虽自动合并，但 Anthropic tool 循环 / LLM 调用失败补发等场景容易出现
+                    // 连续两条 user。若上一条已是 user，把本条的内容块并进其 content 列表（块数组归并）。
+                    val blocks = message.toAnthropicUserContentBlocks()
+                    val previous = result.lastOrNull()
+                    val previousBlocks = (previous?.content as? List<*>)?.filterIsInstance<AnthropicContentBlock>()
+                    if (previous?.role == "user" && !previousBlocks.isNullOrEmpty()) {
+                        result[result.lastIndex] = previous.copy(
+                            content = previousBlocks.filter { it.type != "tool_result" } + blocks
+                        )
+                    } else {
+                        result.add(
+                            AnthropicMessage(role = "user", content = message.toAnthropicUserContent())
+                        )
+                    }
                     lastPlainUserIndex = result.lastIndex
                     lastAssistantHadToolUse = false
                 }
@@ -504,7 +534,8 @@ class AnthropicAdapter @Inject constructor(
                     val resultBlock = AnthropicContentBlock(
                         type = "tool_result",
                         tool_use_id = message.id,
-                        content = content
+                        content = content,
+                        is_error = message.isError.takeIf { it }  // 仅失败时置 true（官方允许省略即 false）
                     )
                     // 同一条 assistant 里的多个 tool_use，其 tool_result 必须全部放进紧随的那一条 user 消息：
                     // 官方端会把连续的 user 消息合并成一轮，但部分兼容网关不合并，会直接报
@@ -522,6 +553,19 @@ class AnthropicAdapter @Inject constructor(
                     }
                 }
             }
+        }
+
+        // 首条消息角色兜底：历史若以 assistant（含 thinking 快照）或 tool_result 开头（崩溃恢复 /
+        // 工具循环中断的会话），严格网关会拒收非 user 首条。官方端会把连续同角色轮合并，因此这里
+        // 前置一条空白 user 消息即可（与后续同角色轮合并成一轮，不改变语义）。
+        if (result.isNotEmpty() && result.first().role != "user") {
+            result.add(
+                0,
+                AnthropicMessage(
+                    role = "user",
+                    content = listOf(AnthropicContentBlock(type = "text", text = " "))
+                )
+            )
         }
 
         // messages 断点：打在最后一条普通 user 消息的 text 块上（Anthropic 不允许打在 tool_result/thinking/image 块）。
@@ -597,6 +641,15 @@ class AnthropicAdapter @Inject constructor(
     private fun AgentMessage.UserMessage.toAnthropicUserContent(): Any {
         if (images.isEmpty()) return content
 
+        val blocks = toAnthropicUserContentBlocks()
+        return blocks
+    }
+
+    /** 统一把 user 消息规范为内容块列表（文本 + 图片），供内容数组与连续 user 合并复用。 */
+    private fun AgentMessage.UserMessage.toAnthropicUserContentBlocks(): List<AnthropicContentBlock> {
+        if (images.isEmpty()) {
+            return if (content.isBlank()) emptyList() else listOf(AnthropicContentBlock(type = "text", text = content))
+        }
         val blocks = mutableListOf<AnthropicContentBlock>()
         if (content.isNotBlank()) {
             blocks.add(AnthropicContentBlock(type = "text", text = content))
@@ -627,6 +680,9 @@ class AnthropicAdapter @Inject constructor(
 
         /** 开启 thinking 时为正文预留的最小 token 数（max_tokens 必须大于思考预算）。 */
         const val MIN_CONTENT_TOKENS = 4096
+
+        /** 官方要求 thinking budget_tokens ≥ 1024。 */
+        const val MIN_BUDGET_TOKENS = 1024
 
         val gson = com.google.gson.Gson()
     }

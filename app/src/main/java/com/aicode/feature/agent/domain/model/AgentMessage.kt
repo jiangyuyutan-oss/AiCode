@@ -38,7 +38,12 @@ sealed class AgentMessage {
         val result: String,
         val images: List<AgentImage> = emptyList(),
         /** 仅喂模型的精简结果文本；null 时回退用 [result]。UI 与持久化仍用 result。 */
-        val modelResult: String? = null
+        val modelResult: String? = null,
+        /**
+         * 工具执行是否失败（用户拒绝 / 执行出错 / 策略拒绝）。用于工具结果回传时如实标记
+         * `is_error`（Anthropic Messages API），避免把失败当成功喂给模型。
+         */
+        val isError: Boolean = false
     ) : AgentMessage()
 }
 
