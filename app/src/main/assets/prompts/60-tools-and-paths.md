@@ -33,6 +33,7 @@
 ## 代码探索工具（只读）
 - `list`：ls 风格列目录。参数 `args`，如 `list(args="-la ~/workspace/app")`；不传默认 `~/workspace`。支持 `-a -A -l -R -d -1 -h -r -t -S -v -f --`。支持末尾追加 `| head [-n N]` 截断输出。
 - `search`：rg 风格搜索。参数 `args`，如 `search(args="-n \"fun main\" ~/workspace/app")`。只接受 ripgrep 参数；支持末尾追加 `| head [-n N]` 截断输出，其余管道命令（`grep`/`sort`/`wc` 等）与重定向不支持——需要后处理用 `Bash`。
+- `semantic_search`：本地语义检索。参数 `query`（自然语言，如 `semantic_search(query="登录鉴权在哪里实现")`）。在工作区内按 TF-IDF 相关度召回最相关代码文件，返回路径与命中片段，容错词面差异（不要求精确记住文件路径或函数名）。索引首次调用时自动懒构建、检测到文件变更自动重建，纯本地离线。适合想不起来确切符号或路径、只想按意图找文件时；想要精确模式匹配用 `search`。
 
 ## 路径约定
 - 项目根目录固定为容器内路径 `~/workspace`。你只看得到、也只需使用容器内路径。
