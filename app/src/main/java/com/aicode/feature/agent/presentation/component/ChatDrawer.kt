@@ -88,6 +88,7 @@ import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Download
 import compose.icons.feathericons.Edit2
 import compose.icons.feathericons.FilePlus
+import compose.icons.feathericons.FileText
 import compose.icons.feathericons.Folder
 import compose.icons.feathericons.FolderPlus
 import compose.icons.feathericons.RefreshCw
@@ -121,6 +122,7 @@ fun ChatDrawerContent(
     onRename: (ChatSession, String) -> Unit,
     onTogglePin: (ChatSession) -> Unit,
     onExport: (ChatSession) -> Unit,
+    onExportMarkdown: (ChatSession) -> Unit = {},
     subSessionsByParent: Map<String, List<ChatSession>> = emptyMap(),
     browseState: FileBrowseState,
     expandedPaths: Set<String>,
@@ -276,6 +278,10 @@ fun ChatDrawerContent(
             onExport = {
                 menuSession = null
                 onExport(session)
+            },
+            onExportMarkdown = {
+                menuSession = null
+                onExportMarkdown(session)
             },
             onDelete = {
                 menuSession = null
@@ -966,6 +972,7 @@ private fun SessionActionSheet(
     onTogglePin: () -> Unit,
     onRename: () -> Unit,
     onExport: () -> Unit,
+    onExportMarkdown: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1015,6 +1022,15 @@ private fun SessionActionSheet(
                 onClick = {
                     onDismiss()
                     onExport()
+                }
+            )
+            SheetActionRow(
+                icon = FeatherIcons.FileText,
+                label = stringResource(R.string.chat_export_session_markdown),
+                tint = MaterialTheme.colorScheme.onSurface,
+                onClick = {
+                    onDismiss()
+                    onExportMarkdown()
                 }
             )
             SheetActionRow(
