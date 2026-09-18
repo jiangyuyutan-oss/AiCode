@@ -104,7 +104,13 @@ class GitViewModel @Inject constructor(
         /** 正在查看 diff 的文件路径；加载中（diffData 为 null）时供顶栏显示文件名。 */
         val diffPath: String? = null,
         /** diff 视图数据；非 null 时 diff 页渲染内容。 */
-        val diffData: DiffData? = null
+        val diffData: DiffData? = null,
+        /** 是否处于合并中（存在 MERGE_HEAD），Git 页顶部显示冲突横幅。 */
+        val isMerging: Boolean = false,
+        /** 是否处于变基中（存在 REBASE_HEAD）。 */
+        val isRebasing: Boolean = false,
+        /** 合并/变基未解决的冲突文件路径列表。 */
+        val conflicts: List<String> = emptyList()
     )
 
     private val _state = MutableStateFlow(GitUiState())
@@ -120,18 +126,29 @@ class GitViewModel @Inject constructor(
         val graph: GitGraph,
         val hasRemote: Boolean,
         val hasIdentity: Boolean = false,
-        val untrackedDirFiles: Map<String, List<String>> = emptyMap()
+        val untrackedDirFiles: Map<String, List<String>> = emptyMap(),
+        val isMerging: Boolean = false,
+        val isRebasing: Boolean = false,
+        val conflicts: List<String> = emptyList()
     )
 
-    /** 并发拉取轻量快照：status + graph(本地 refs) + remote + 可选 identity。 */
+    /** 并发拉取轻量快照：status + graph(本地 refs) + remote + 可选 identity + 合并状态。 */
     private suspend fun loadSnapshot(includeIdentity: Boolean): RepoSnapshot = coroutineScope {
         val s = async { repository.status() }
         val localRefs = async { repository.localRefsOnly() }
         val r = async { repository.hasRemote() }
         val id = async { if (includeIdentity) repository.getUserName().isNotBlank() else false }
         val g = async { repository.graph(refs = localRefs.await()) }
+        val merging = async { repository.isMerging() }
+        val rebasing = async { repository.isRebasing() }
         val status = s.await()
-        RepoSnapshot(status, g.await(), r.await(), id.await(), reloadExpandedUntrackedDirs(status))
+        // 冲突文件只在处于合并/变基中才值得解析；否则额外跑一次 status 纯属浪费。
+        val conflicts = if (merging.await() || rebasing.await()) repository.mergeConflicts() else emptyList()
+        RepoSnapshot(
+            status, g.await(), r.await(), id.await(),
+            reloadExpandedUntrackedDirs(status),
+            merging.await(), rebasing.await(), conflicts
+        )
     }
 
     /**
@@ -213,7 +230,7 @@ class GitViewModel @Inject constructor(
                 val snap = loadSnapshot(includeIdentity = true)
                 val commits = snap.graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
                 _state.update {
-                    it.copy(loading = false, notARepo = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, hasIdentity = snap.hasIdentity, untrackedDirFiles = snap.untrackedDirFiles, branchesLoaded = false, branchesLoading = false, branches = emptyList(), tags = emptyList())
+                    it.copy(loading = false, notARepo = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, hasIdentity = snap.hasIdentity, untrackedDirFiles = snap.untrackedDirFiles, isMerging = snap.isMerging, isRebasing = snap.isRebasing, conflicts = snap.conflicts, branchesLoaded = false, branchesLoading = false, branches = emptyList(), tags = emptyList())
                 }
                 // 页面已打开：后台拉取全量分支/标签，用户切到 BRANCHES tab 时无需再等。
                 loadBranches()
@@ -248,7 +265,7 @@ class GitViewModel @Inject constructor(
                 if (repository.isRepo()) {
                     val snap = loadSnapshot(includeIdentity = false)
                     val commits = snap.graph.commits.map { GitCommit(it.hash, it.shortHash, it.author, it.date, it.message) }
-                    _state.update { it.copy(busy = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, untrackedDirFiles = snap.untrackedDirFiles, notARepo = false, toast = msg) }
+                    _state.update { it.copy(busy = false, status = snap.status, commits = commits, graph = snap.graph, hasRemote = snap.hasRemote, untrackedDirFiles = snap.untrackedDirFiles, isMerging = snap.isMerging, isRebasing = snap.isRebasing, conflicts = snap.conflicts, notARepo = false, toast = msg) }
                     refreshBranchesIfLoaded()
                 } else {
                     _state.update { it.copy(busy = false, notARepo = true, toast = msg) }
@@ -322,6 +339,22 @@ class GitViewModel @Inject constructor(
         }
         runAction(R.string.git_push, { repository.push() })
     }
+
+    /** 把 [branch] 合并进当前分支；冲突时刷新后 isMerging=true 并展示冲突横幅。 */
+    fun merge(branch: String) = runAction(R.string.git_action_merge, { repository.merge(branch) })
+
+    /** 当前分支变基到 [branch]；冲突时刷新后 isRebasing=true 并展示冲突横幅。 */
+    fun rebase(branch: String) = runAction(R.string.git_action_rebase, { repository.rebase(branch) })
+
+    /** 中止当前合并或变基（据状态自动选择），回到操作前状态。 */
+    fun abortOperation() {
+        val state = _state.value
+        val action = if (state.isRebasing) repository::abortRebase else repository::abortMerge
+        runAction(R.string.git_action_abort, { action() })
+    }
+
+    /** 冲突解决并 stage 后继续变基。 */
+    fun continueRebase() = runAction(R.string.git_action_continue_rebase, { repository.continueRebase() })
 
     /**
      * 打开某条提交的详情弹层。若文件清单尚未加载则懒加载（不置 [GitUiState.busy]，

@@ -49,6 +49,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -68,6 +70,7 @@ import com.aicode.feature.git.domain.model.GitTab
 import com.aicode.feature.git.presentation.GitViewModel
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Activity
+import compose.icons.feathericons.AlertTriangle
 import compose.icons.feathericons.ArrowLeft
 import compose.icons.feathericons.GitBranch
 import compose.icons.feathericons.GitCommit
@@ -159,6 +162,14 @@ fun GitScreen(
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize()) {
+            if ((state.isMerging || state.isRebasing) && !state.loading && !state.notARepo) {
+                MergeConflictBanner(
+                    isRebasing = state.isRebasing,
+                    conflicts = state.conflicts,
+                    onAbort = viewModel::abortOperation,
+                    onContinue = viewModel::continueRebase
+                )
+            }
             when {
                 state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -214,7 +225,10 @@ fun GitScreen(
                             onDeleteRemoteBranch = viewModel::deleteRemoteBranch,
                             onRenameBranch = viewModel::renameBranch,
                             onCreateTag = viewModel::createTag,
-                            onDeleteTag = viewModel::deleteTag
+                            onDeleteTag = viewModel::deleteTag,
+                            onMergeBranch = { branch, rebase ->
+                                if (rebase) viewModel.rebase(branch) else viewModel.merge(branch)
+                            }
                         )
                         GitTab.LOG -> LogTab(
                             graph = state.graph,
@@ -417,4 +431,69 @@ private fun CommitDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } }
     )
+}
+
+/** 合并/变基冲突横幅：跨 tab 置顶展示冲突状态，提供中止与继续操作。 */
+@Composable
+private fun MergeConflictBanner(
+    isRebasing: Boolean,
+    conflicts: List<String>,
+    onAbort: () -> Unit,
+    onContinue: () -> Unit,
+) {
+    val bg = MaterialTheme.colorScheme.errorContainer
+    val fg = MaterialTheme.colorScheme.onErrorContainer
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(bg)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = FeatherIcons.AlertTriangle,
+                contentDescription = null,
+                tint = fg,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                text = stringResource(if (isRebasing) R.string.git_rebase_conflict_banner_title else R.string.git_merge_conflict_banner_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = fg
+            )
+        }
+        if (conflicts.isEmpty()) {
+            Text(
+                text = stringResource(R.string.git_conflict_hint_terminal),
+                style = MaterialTheme.typography.bodySmall,
+                color = fg,
+                modifier = Modifier.padding(top = Spacing.xs)
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.git_conflict_files, conflicts.size),
+                style = MaterialTheme.typography.bodySmall,
+                color = fg,
+                modifier = Modifier.padding(top = Spacing.xs)
+            )
+            conflicts.take(3).forEach { path ->
+                Text(
+                    text = "• $path",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = fg,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = Spacing.sm)
+                )
+            }
+        }
+        Row(modifier = Modifier.padding(top = Spacing.xs)) {
+            FilledTonalButton(onClick = onAbort) { Text(stringResource(R.string.git_action_abort)) }
+            if (isRebasing) {
+                Spacer(Modifier.width(Spacing.sm))
+                FilledTonalButton(onClick = onContinue) { Text(stringResource(R.string.git_action_continue_rebase)) }
+            }
+        }
+    }
 }

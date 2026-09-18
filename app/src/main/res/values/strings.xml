@@ -766,6 +766,17 @@
     <string name="git_pull_dirty_confirm">当前工作区有未提交改动，拉取可能导致冲突。建议先提交或暂存。仍要继续拉取吗？</string>
     <string name="git_pull_continue">继续拉取</string>
 
+    <!-- Git 分支合并 / 变基 -->
+    <string name="git_action_merge">合并</string>
+    <string name="git_action_rebase">变基</string>
+    <string name="git_action_abort">中止</string>
+    <string name="git_action_continue_rebase">继续变基</string>
+    <string name="git_merge_confirm_message">把 %1$s 合并进当前分支 %2$s？可合并或变基。</string>
+    <string name="git_merge_conflict_banner_title">合并冲突</string>
+    <string name="git_rebase_conflict_banner_title">变基冲突</string>
+    <string name="git_conflict_files">冲突文件 %1$d 个</string>
+    <string name="git_conflict_hint_terminal">在工作区终端手动解决冲突，解决后点击「继续」完成操作</string>
+
     <!-- Git Toast Messages -->
     <string name="git_toast_load_branches_failed">加载分支失败: %1$s</string>
     <string name="git_toast_refresh_failed">刷新失败: %1$s</string>
