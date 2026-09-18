@@ -342,12 +342,14 @@ internal fun ChatInputBar(
                             AgentMode.AUTO -> MaterialTheme.colorScheme.error
                             AgentMode.TARGET -> MaterialTheme.colorScheme.tertiaryContainer
                             AgentMode.BUILD -> MaterialTheme.semanticColors.success
+                            AgentMode.GOD -> MaterialTheme.colorScheme.secondaryContainer
                         }
                         val modeTextColor = when (currentMode) {
                             AgentMode.PLAN -> MaterialTheme.colorScheme.onPrimaryContainer
                             AgentMode.AUTO -> MaterialTheme.colorScheme.onError
                             AgentMode.TARGET -> MaterialTheme.colorScheme.onTertiaryContainer
                             AgentMode.BUILD -> MaterialTheme.semanticColors.onSuccess
+                            AgentMode.GOD -> MaterialTheme.colorScheme.onSecondaryContainer
                         }
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -358,7 +360,8 @@ internal fun ChatInputBar(
                                         AgentMode.BUILD -> AgentMode.PLAN
                                         AgentMode.PLAN -> AgentMode.AUTO
                                         AgentMode.AUTO -> AgentMode.TARGET
-                                        AgentMode.TARGET -> AgentMode.BUILD
+                                        AgentMode.TARGET -> AgentMode.GOD
+                                        AgentMode.GOD -> AgentMode.BUILD
                                     }
                                     onToggleMode(nextMode)
                                 }

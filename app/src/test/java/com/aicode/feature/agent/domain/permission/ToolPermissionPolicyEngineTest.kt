@@ -151,6 +151,46 @@ class ToolPermissionPolicyEngineTest {
         assertEquals(ToolPermissionPolicyEngine.Verdict.DENY, r.verdict)
     }
 
+    // ── GOD（神谕）模式放行，保留灾难性 rm 防护 ─────────────────────
+
+    @Test
+    fun godMode_allowsWriteTool() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.WRITE_WORKSPACE), "writeFile", emptyMap(), AgentMode.GOD)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.ALLOW, r.verdict)
+    }
+
+    @Test
+    fun godMode_allowsBash() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("ls -la"), AgentMode.GOD)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.ALLOW, r.verdict)
+    }
+
+    @Test
+    fun godMode_stillBlocksCatastrophicRm() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("rm -rf /"), AgentMode.GOD)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.DENY, r.verdict)
+        assertEquals("安全防护：禁止执行高危删除操作（根目录删除）", r.denyReason)
+    }
+
+    @Test
+    fun godMode_stillBlocksWorkspaceRm() = runTest {
+        val e = engine()
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("rm -rf ~/workspace/*"), AgentMode.GOD)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.DENY, r.verdict)
+    }
+
+    @Test
+    fun godMode_catastrophicRmDeniedEvenWithAllowRule() = runTest {
+        val e = engine(
+            PermissionRule("Bash", "rm -rf", PermissionDecision.ALLOW)
+        )
+        val r = e.evaluate(tool(ToolCapability.EXECUTE_COMMANDS), "Bash", bash("rm -rf /"), AgentMode.GOD)
+        assertEquals(ToolPermissionPolicyEngine.Verdict.DENY, r.verdict)
+    }
+
     // ── 只读 Agent 配置自动放行 ─────────────────────────────────────
 
     @Test

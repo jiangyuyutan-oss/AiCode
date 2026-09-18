@@ -122,6 +122,7 @@ class StatefulAgentWorkflow @Inject constructor(
         const val MODE_REMINDER_PLAN_FILE = "80-plan-mode.md"
         const val MODE_REMINDER_AUTO_FILE = "81-auto-mode.md"
         const val MODE_REMINDER_TARGET_FILE = "82-target-mode.md"
+        const val MODE_REMINDER_GOD_FILE = "83-god-mode.md"
         val LEADING_COMMENT = Regex("(?s)^\\s*<!--.*?-->\\s*")
         /** 模型直出图片落盘目录（与 GenerateImageTool 保持一致）。 */
         const val GENERATED_IMAGE_DIR = "~/.aicode/generated-images"
@@ -1237,6 +1238,10 @@ class StatefulAgentWorkflow @Inject constructor(
             .trim()
             .let { "【模式提醒】$it" }
         AgentMode.BUILD -> null
+        AgentMode.GOD -> promptProvider.resolvePrompt(MODE_REMINDER_GOD_FILE)
+            .replace(LEADING_COMMENT, "")
+            .trim()
+            .let { "【模式提醒】$it" }
     }
 
     /** 工具切换成功后拼进 switchMode 工具结果的模式状态通知（当轮即可见，无需等下一条用户消息）。 */
@@ -1260,6 +1265,9 @@ class StatefulAgentWorkflow @Inject constructor(
         AgentMode.TARGET -> "\n\n" + promptProvider.resolvePrompt(MODE_REMINDER_TARGET_FILE)
             .replace(LEADING_COMMENT, "")
             .replace("{goalStatement}", goalStatement?.takeIf { it.isNotBlank() } ?: GOAL_STATEMENT_PLACEHOLDER)
+            .trim()
+        AgentMode.GOD -> "\n\n" + promptProvider.resolvePrompt(MODE_REMINDER_GOD_FILE)
+            .replace(LEADING_COMMENT, "")
             .trim()
     }
 
