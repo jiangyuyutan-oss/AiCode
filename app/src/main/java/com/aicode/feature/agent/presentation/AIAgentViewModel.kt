@@ -19,6 +19,7 @@ import com.aicode.feature.agent.data.local.dao.AgentMessageDao
 import com.aicode.feature.agent.domain.checkpoint.CheckpointManager
 import com.aicode.feature.agent.data.local.dao.CheckpointDao
 import com.aicode.feature.agent.data.local.dao.ChatSessionDao
+import com.aicode.feature.agent.data.local.entity.AgentMessageEntity
 import com.aicode.feature.agent.data.local.entity.ChatSessionEntity
 import com.aicode.feature.agent.domain.container.ContainerInitState
 import com.aicode.feature.agent.domain.container.LinuxContainerEngine
@@ -2359,6 +2360,29 @@ class AIAgentViewModel @Inject constructor(
         }
     }
 
+    /** 从指定消息处分叉新会话：锚点及之前消息复制为新会话上下文，原会话不变。 */
+    fun forkSessionAt(messageId: String) = viewModelScope.launch {
+        val curId = _currentSessionId.value ?: return@launch
+        val ws = _currentWorkspace.value
+        if (ws.isBlank()) return@launch
+        try {
+            val source = agentMessageDao.getMessagesBySessionOnce(curId)
+            val newSessionId = createAndUpsertSession(ws)
+            val forked = buildForkedMessages(source, messageId, newSessionId)
+            if (forked.isEmpty()) {
+                // 锚点无效或源为空：回滚刚建的空会话，不留垃圾
+                sessionUseCase.deleteSession(newSessionId)
+                return@launch
+            }
+            agentMessageDao.insertAll(forked)
+            val origTitle = sessionUseCase.getSessionById(curId)?.title
+            if (!origTitle.isNullOrBlank()) sessionUseCase.updateTitle(newSessionId, origTitle)
+            _currentSessionId.value = newSessionId
+        } catch (e: Exception) {
+            FileLogger.e(TAG, "forkSessionAt failed", e)
+        }
+    }
+
     private fun detectLanguage(filePath: String): String {
         return when (filePath.substringAfterLast(".").lowercase()) {
             "kt", "kotlin" -> "kotlin"
@@ -2373,5 +2397,24 @@ class AIAgentViewModel @Inject constructor(
             "rs" -> "rust"
             else -> "text"
         }
+    }
+}
+
+/**
+ * 分叉复制：返回锚点消息（含）之前的所有消息，重生成 id 并替换 sessionId，其余字段原样。
+ * 锚点不存在或源为空时返回空列表，调用方据此回滚新建的空会话。
+ */
+internal fun buildForkedMessages(
+    source: List<AgentMessageEntity>,
+    anchorId: String,
+    newSessionId: String,
+): List<AgentMessageEntity> {
+    val anchorIndex = source.indexOfFirst { it.id == anchorId }
+    if (anchorIndex < 0) return emptyList()
+    return source.subList(0, anchorIndex + 1).map { entity ->
+        entity.copy(
+            id = java.util.UUID.randomUUID().toString(),
+            sessionId = newSessionId,
+        )
     }
 }

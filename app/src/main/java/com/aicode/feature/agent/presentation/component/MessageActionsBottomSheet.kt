@@ -32,6 +32,7 @@ import com.aicode.feature.agent.presentation.hasVisibleContent
 import compose.icons.FeatherIcons
 import compose.icons.feathericons.Copy
 import compose.icons.feathericons.Edit2
+import compose.icons.feathericons.GitBranch
 import compose.icons.feathericons.Trash2
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,7 +42,8 @@ internal fun MessageActionsBottomSheet(
     onDismiss: () -> Unit,
     onEditClick: () -> Unit,
     onCopyClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onForkClick: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -75,6 +77,16 @@ internal fun MessageActionsBottomSheet(
                 onClick = {
                     onDismiss()
                     onEditClick()
+                }
+            )
+
+            // 在此分叉新会话
+            MessageActionItem(
+                icon = FeatherIcons.GitBranch,
+                title = stringResource(R.string.chat_action_fork),
+                onClick = {
+                    onDismiss()
+                    onForkClick()
                 }
             )
 
