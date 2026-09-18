@@ -107,6 +107,30 @@ class SwitchModeToolTest {
     }
 
     @Test
+    fun toGod_succeedsAndPersistsMode() = runTest {
+        coEvery { dao.getById("s1") } returns session(AgentMode.BUILD.name)
+        val upserted = slot<ChatSessionEntity>()
+        coEvery { dao.upsert(capture(upserted)) } just runs
+
+        val r = tool.executeWithContext(args("GOD"), context(AgentMode.BUILD))
+
+        assertTrue(r is ToolResult.Success)
+        assertEquals(AgentMode.GOD.name, upserted.captured.mode)
+    }
+
+    @Test
+    fun fromGod_toBuild_succeeds() = runTest {
+        coEvery { dao.getById("s1") } returns session(AgentMode.GOD.name)
+        val upserted = slot<ChatSessionEntity>()
+        coEvery { dao.upsert(capture(upserted)) } just runs
+
+        val r = tool.executeWithContext(args("BUILD"), context(AgentMode.GOD))
+
+        assertTrue(r is ToolResult.Success)
+        assertEquals(AgentMode.BUILD.name, upserted.captured.mode)
+    }
+
+    @Test
     fun success_toTarget_resetsCountersAndSavesGoal() = runTest {
         coEvery { dao.getById("s1") } returns session(AgentMode.BUILD.name)
         val upserted = slot<ChatSessionEntity>()

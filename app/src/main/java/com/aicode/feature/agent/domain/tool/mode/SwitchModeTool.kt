@@ -24,7 +24,7 @@ class SwitchModeTool @Inject constructor(
 ) : AbstractContextualTool() {
 
     override val name = "switchMode"
-    override val description = "切换当前会话的模式。支持 PLAN / BUILD / TARGET 三种切换。BUILD 切换到 PLAN 可构思复杂逻辑，PLAN 计划完成后切 BUILD 修改代码。切换到 TARGET 模式需提供 goal 参数设定目标声明，进入后 AI 依据目标自主执行直到达成或失败。切换前需要用户授权。注意：AUTO（自动）模式只能由用户在界面上手动切换进入，本工具无法切换到 AUTO；但处于 AUTO 模式时，可通过本工具切换到 PLAN 模式退出自动模式（这是 AI 退出 AUTO 的唯一路径）。"
+    override val description = "切换当前会话的模式。支持 PLAN / BUILD / TARGET / GOD 四种切换。BUILD 切换到 PLAN 可构思复杂逻辑，PLAN 计划完成后切 BUILD 修改代码。切换到 TARGET 模式需提供 goal 参数设定目标声明，进入后 AI 依据目标自主执行直到达成或失败。GOD（神谕/乙方公司）模式：主会话升级为 CEO/总汇报员，可经 orchestrate 工具派发部门子代理、组评审团、双风格产出并向甲方(用户)汇报，治理(权限审批/模式切换)由 CEO 代为决策。切换前需要用户授权。注意：AUTO（自动）模式只能由用户在界面上手动切换进入，本工具无法切换到 AUTO；但处于 AUTO 模式时，可通过本工具切换到 PLAN 模式退出自动模式（这是 AI 退出 AUTO 的唯一路径）。"
     override val permissionPolicy = ToolPermissionPolicy.ASK
     override val capabilities = setOf(ToolCapability.MODIFY_SESSION_STATE)
 
@@ -32,9 +32,9 @@ class SwitchModeTool @Inject constructor(
         "mode" to ToolParameter(
             name = "mode",
             type = ParameterType.STRING,
-            description = "目标模式，必须是 'PLAN'、'BUILD' 或 'TARGET'",
+            description = "目标模式，必须是 'PLAN'、'BUILD'、'TARGET' 或 'GOD'",
             required = true,
-            enum = listOf("PLAN", "BUILD", "TARGET")
+            enum = listOf("PLAN", "BUILD", "TARGET", "GOD")
         ),
         "reason" to ToolParameter(
             name = "reason",
@@ -63,7 +63,7 @@ class SwitchModeTool @Inject constructor(
         val targetMode = try {
             AgentMode.valueOf(targetModeStr)
         } catch (e: Exception) {
-            return ToolResult.Error("无效的模式: $targetModeStr，只能是 PLAN、BUILD 或 TARGET", "INVALID_MODE")
+            return ToolResult.Error("无效的模式: $targetModeStr，只能是 PLAN、BUILD、TARGET 或 GOD", "INVALID_MODE")
         }
 
         if (targetMode == AgentMode.AUTO) {
