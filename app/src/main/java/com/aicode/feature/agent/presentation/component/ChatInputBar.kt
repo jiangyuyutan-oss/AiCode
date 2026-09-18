@@ -98,6 +98,7 @@ import compose.icons.feathericons.Check
 import compose.icons.feathericons.ChevronDown
 import compose.icons.feathericons.ChevronUp
 import compose.icons.feathericons.Copy
+import compose.icons.feathericons.Mic
 import compose.icons.feathericons.Plus
 import compose.icons.feathericons.Square
 import kotlinx.coroutines.launch
@@ -133,6 +134,9 @@ internal fun ChatInputBar(
     onUploadFile: () -> Unit,
     onUploadImage: () -> Unit,
     onTakePhoto: () -> Unit,
+    /** 语音听写进行中：麦克风按钮切换为停止态。 */
+    isListening: Boolean = false,
+    onToggleVoice: () -> Unit = {},
     slashCommands: List<SlashCommandHandler> = emptyList(),
     queuedRequests: List<QueuedRequest> = emptyList(),
     onRemoveQueued: (String) -> Unit = {},
@@ -417,6 +421,24 @@ internal fun ChatInputBar(
                         contentDescription = stringResource(R.string.chat_add_attachment),
                         onClick = { showAttachmentSheet = true }
                     )
+                    IconButton(
+                        enabled = !isBusy,
+                        onClick = onToggleVoice
+                    ) {
+                        if (isListening) {
+                            Icon(
+                                imageVector = FeatherIcons.Square,
+                                contentDescription = stringResource(R.string.chat_voice_listening),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Icon(
+                                imageVector = FeatherIcons.Mic,
+                                contentDescription = stringResource(R.string.chat_voice_input),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                     IconButton(
                         enabled = !isBusy && value.isNotBlank() && !optimizingInput,
                         onClick = onOptimizeInput

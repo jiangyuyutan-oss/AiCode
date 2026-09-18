@@ -1398,4 +1398,12 @@
     <string name="share_text_truncated">Shared content too long, kept first %1$d characters</string>
     <string name="share_image_load_failed">Some images failed to load, only valid content injected</string>
     <string name="share_empty_content">No valid content received</string>
+
+    <!-- Voice dictation -->
+    <string name="chat_voice_input">Voice input</string>
+    <string name="chat_voice_listening">Listening, tap to stop</string>
+    <string name="chat_voice_permission_denied">Microphone permission is required for voice input</string>
+    <string name="chat_voice_unavailable">Speech recognition is unavailable on this device</string>
+    <string name="chat_voice_no_match">Nothing heard, please try again</string>
+    <string name="chat_voice_error">Speech recognition failed</string>
 </resources>

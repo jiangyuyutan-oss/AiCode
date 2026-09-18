@@ -603,6 +603,50 @@ fun AIChatPanel(
         takePictureLauncher.launch(uri)
     }
 
+    // ── 语音听写：系统 SpeechRecognizer 内嵌实时出字，定稿经 onValueChange 走草稿落盘 ──
+    val voiceController = remember {
+        ChatVoiceInputController(
+            context = context,
+            onPartialPreview = { partial -> inputText = partial },
+            onFinal = { final ->
+                inputText = final
+                viewModel.updateInputDraft(final)
+            },
+            onError = { error ->
+                val msg = when (error) {
+                    ChatVoiceInputController.ChatVoiceError.NO_MATCH -> R.string.chat_voice_no_match
+                    ChatVoiceInputController.ChatVoiceError.FAILED -> R.string.chat_voice_error
+                }
+                Toast.makeText(context, context.getString(msg), Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { voiceController.destroy() }
+    }
+    val voicePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) voiceController.start(inputText)
+        else Toast.makeText(context, context.getString(R.string.chat_voice_permission_denied), Toast.LENGTH_SHORT).show()
+    }
+    fun toggleVoice() {
+        if (!voiceController.available) {
+            Toast.makeText(context, context.getString(R.string.chat_voice_unavailable), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (voiceController.isListening) {
+            voiceController.stop()
+        } else if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.RECORD_AUDIO
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            voiceController.start(inputText)
+        } else {
+            voicePermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     // 流式结束过渡：streamingText 清空后保留最后文本一小段（落库消息通常在此窗口内接管），
     // 避免尾巴 item 高度骤减导致视口被 clamp 上移、露出历史消息（结束瞬间“闪回”看到用户消息）。
     var tailStreamingText by remember { mutableStateOf<String?>(null) }
@@ -1245,6 +1289,8 @@ fun AIChatPanel(
                     )
                 },
                 onTakePhoto = ::takePhoto,
+                isListening = voiceController.isListening,
+                onToggleVoice = ::toggleVoice,
                 slashCommands = viewModel.slashCommands,
                 queuedRequests = queuedRequests,
                 onRemoveQueued = { viewModel.removeQueuedRequest(it) },
