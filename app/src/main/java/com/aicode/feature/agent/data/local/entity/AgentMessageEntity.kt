@@ -80,6 +80,9 @@ data class AgentMessageEntity(
         return runCatching { json.decodeFromString<List<AgentAttachment>>(value) }.getOrDefault(emptyList())
     }
 
+    /** Markdown 导出等场景读取用户附件元数据（内部用）。 */
+    internal fun exportedAttachments(): List<AgentAttachment> = decodeAttachments(attachmentsJson)
+
     private companion object {
         val json = Json { ignoreUnknownKeys = true }
     }

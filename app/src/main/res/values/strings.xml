@@ -524,6 +524,7 @@
     <string name="chat_rename_session">重命名会话</string>
     <string name="chat_session_name">会话名</string>
     <string name="chat_export_session">导出会话</string>
+    <string name="chat_export_session_markdown">导出 Markdown</string>
     <string name="chat_export_session_done">会话已导出</string>
     <string name="chat_export_session_failed">导出失败</string>
 

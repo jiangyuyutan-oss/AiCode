@@ -72,6 +72,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import com.aicode.feature.backup.domain.BackupManager
+import com.aicode.feature.backup.domain.SessionMarkdownExporter
 import com.aicode.feature.agent.domain.command.SlashCommandContext
 import com.aicode.feature.agent.domain.command.SlashCommandRegistry
 import com.aicode.feature.agent.domain.command.SlashCommandHandler
@@ -2275,6 +2276,25 @@ class AIAgentViewModel @Inject constructor(
             onResult(true)
         } catch (e: Exception) {
             FileLogger.e("AIAgentViewModel", "exportSession failed", e)
+            onResult(false)
+        } finally {
+            runCatching { output.close() }
+        }
+    }
+
+    /** 导出单个会话为 Markdown 可读文档，写入 [output]（调用方打开，本方法负责关闭）。成功回调 true，失败回调 false。 */
+    fun exportSessionMarkdown(sessionId: String, output: OutputStream, onResult: (Boolean) -> Unit) = viewModelScope.launch {
+        try {
+            val session = sessionUseCase.getSessionById(sessionId)
+            val messages = withContext(Dispatchers.IO) { agentMessageDao.getMessagesBySessionOnce(sessionId) }
+            val markdown = SessionMarkdownExporter.build(
+                title = session?.title.orEmpty(),
+                messages = messages,
+            )
+            withContext(Dispatchers.IO) { output.write(markdown.toByteArray(Charsets.UTF_8)) }
+            onResult(true)
+        } catch (e: Exception) {
+            FileLogger.e("AIAgentViewModel", "exportSessionMarkdown failed", e)
             onResult(false)
         } finally {
             runCatching { output.close() }

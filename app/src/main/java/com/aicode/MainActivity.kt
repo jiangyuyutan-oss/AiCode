@@ -470,6 +470,33 @@ fun AppNavigation(
         }
     }
 
+    // ── 导出会话为 Markdown：SAF 保存文件 ──
+    var pendingExportMarkdownSessionId by remember { mutableStateOf<String?>(null) }
+    val sessionMarkdownExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/markdown")
+    ) { uri ->
+        val sessionId = pendingExportMarkdownSessionId
+        if (uri != null && sessionId != null) {
+            scope.launch {
+                val os = withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri) }
+                if (os != null) {
+                    agentViewModel.exportSessionMarkdown(sessionId, os) { success ->
+                        Toast.makeText(
+                            context,
+                            context.getString(if (success) R.string.chat_export_session_done else R.string.chat_export_session_failed),
+                            if (success) Toast.LENGTH_SHORT else Toast.LENGTH_LONG
+                        ).show()
+                    }
+                } else {
+                    Toast.makeText(context, context.getString(R.string.chat_export_session_failed), Toast.LENGTH_LONG).show()
+                }
+                pendingExportMarkdownSessionId = null
+            }
+        } else {
+            pendingExportMarkdownSessionId = null
+        }
+    }
+
     // ── 大屏（平板横屏及以上）布局 ──
     val expanded = isExpandedWidth()
     // 常驻侧栏只在聊天页开：终端 / 编辑器 / 设置都是全屏页，被侧栏挤窄反而难用。
@@ -584,6 +611,11 @@ fun AppNavigation(
                 pendingExportSessionId = session.id
                 val safeTitle = session.title.replace(Regex("[^\\w\\u4e00-\\u9fa5\\-]"), "_")
                 sessionExportLauncher.launch("aicode-session-$safeTitle-${System.currentTimeMillis()}.tar.gz")
+            },
+            onExportMarkdown = { session ->
+                pendingExportMarkdownSessionId = session.id
+                val safeTitle = session.title.replace(Regex("[^\\w\\u4e00-\\u9fa5\\-]"), "_")
+                sessionMarkdownExportLauncher.launch("aicode-session-$safeTitle-${System.currentTimeMillis()}.md")
             },
             onNavigateToSettings = {
                 navController.navigate("settings")
