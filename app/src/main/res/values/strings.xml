@@ -1179,6 +1179,16 @@
     <string name="terminal_preparing_env_failed">正在准备容器环境…\n%1$s</string>
     <string name="terminal_preparing_env_first_run">正在准备容器环境…\n首次运行会解压容器，请稍候</string>
 
+    <!-- Terminal Web Preview -->
+    <string name="terminal_preview">预览</string>
+    <string name="terminal_preview_remote_unavailable">预览仅适用于本地容器模式</string>
+    <string name="terminal_preview_dialog_title">打开容器内 Web 服务</string>
+    <string name="terminal_preview_dialog_hint">输入容器内已启动服务的端口（如 python -m http.server 3000），预览将打开 http://127.0.0.1:端口</string>
+    <string name="terminal_preview_port_hint">端口</string>
+    <string name="terminal_preview_open">打开</string>
+    <string name="terminal_preview_reload">重载</string>
+    <string name="terminal_preview_external">在浏览器中打开</string>
+
     <!-- Terminal Settings & Themes -->
     <string name="terminal_settings_title">终端设置</string>
     <string name="terminal_theme_title">配色主题</string>
