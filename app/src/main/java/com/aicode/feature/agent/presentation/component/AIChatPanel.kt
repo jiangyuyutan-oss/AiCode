@@ -1399,7 +1399,11 @@ fun AIChatPanel(
                             clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("message", message.content)))
                         }
                     },
-                    onDeleteClick = { viewModel.deleteMessage(message.id) }
+                    onDeleteClick = { viewModel.deleteMessage(message.id) },
+                    onForkClick = {
+                        viewModel.forkSessionAt(message.id)
+                        Toast.makeText(context, context.getString(R.string.chat_action_fork_done), Toast.LENGTH_SHORT).show()
+                    }
                 )
             }
 

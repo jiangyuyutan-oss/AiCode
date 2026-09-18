@@ -1250,6 +1250,8 @@
     <string name="chat_more_options">More Options</string>
     <string name="chat_action_edit">Edit Message</string>
     <string name="chat_action_copy">Copy Text</string>
+    <string name="chat_action_fork">Fork Session Here</string>
+    <string name="chat_action_fork_done">Forked session here</string>
     <string name="chat_action_delete">Delete Message</string>
     <string name="chat_edit_dialog_title">Edit Message</string>
     <string name="chat_edit_dialog_hint">Enter message content</string>
