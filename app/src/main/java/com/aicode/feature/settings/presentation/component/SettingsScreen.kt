@@ -184,23 +184,17 @@ fun SettingsScreen(
     onRerunOnboarding: () -> Unit = {},
     onboardingStep: OnboardingStep? = null
 ) {
+    // 顶层只订阅「菜单/跨分区共享」或「被顶层 LaunchedEffect 读取」的状态。
+    // 只被单一分区消费的状态改到各自 AnimatedContent 分支内 collect（见下方 current 分支），
+    // 否则聊天进行中的 tokenStats、MCP 状态、镜像下载等后台流每次发射都会重组整页、打断分区切换动画。
     val providers by viewModel.providers.collectAsStateWithLifecycle()
-    val logLevel by viewModel.logLevel.collectAsStateWithLifecycle()
-    val logViewerState by viewModel.logViewerState.collectAsStateWithLifecycle()
-    val mcpEntries by viewModel.mcpEntries.collectAsStateWithLifecycle()
-    val mcpStatuses by viewModel.mcpStatuses.collectAsStateWithLifecycle()
     val mcpReloading by viewModel.mcpReloading.collectAsStateWithLifecycle()
     val skills by viewModel.skills.collectAsStateWithLifecycle()
     val skillSaveState by viewModel.skillSaveState.collectAsStateWithLifecycle()
     val subAgents by viewModel.subAgents.collectAsStateWithLifecycle()
     val subAgentSaveState by viewModel.subAgentSaveState.collectAsStateWithLifecycle()
-    val globalRules by viewModel.globalRules.collectAsStateWithLifecycle()
-    val projectRules by viewModel.projectRules.collectAsStateWithLifecycle()
     val currentProjectName by viewModel.currentProjectName.collectAsStateWithLifecycle()
-    val keepaliveEnabled by viewModel.keepaliveEnabled.collectAsStateWithLifecycle()
-    val targetModeThresholds by viewModel.targetModeThresholds.collectAsStateWithLifecycle()
-    val screenOnEnabled by viewModel.screenOnEnabled.collectAsStateWithLifecycle()
-    val agentSoundEnabled by viewModel.agentSoundEnabled.collectAsStateWithLifecycle()
+    val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val themePresetId by viewModel.themePresetId.collectAsStateWithLifecycle()
     val dynamicColorEnabled by viewModel.dynamicColorEnabled.collectAsStateWithLifecycle()
@@ -209,35 +203,12 @@ fun SettingsScreen(
     val frostIntensity by viewModel.frostIntensity.collectAsStateWithLifecycle()
     val glassState by viewModel.glassState.collectAsStateWithLifecycle()
     val languageTag by viewModel.languageTag.collectAsStateWithLifecycle()
-    val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
-    val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
-    val compactionProviderId by viewModel.compactionProviderId.collectAsStateWithLifecycle()
-    val compactionModel by viewModel.compactionModel.collectAsStateWithLifecycle()
-    val titleProviderId by viewModel.titleProviderId.collectAsStateWithLifecycle()
-    val titleModel by viewModel.titleModel.collectAsStateWithLifecycle()
-    val imageGenProviderId by viewModel.imageGenProviderId.collectAsStateWithLifecycle()
-    val imageGenModel by viewModel.imageGenModel.collectAsStateWithLifecycle()
-    val modelMetadata by viewModel.modelMetadata.collectAsStateWithLifecycle()
-    val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
-    val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
-    val defaultContainerId by viewModel.defaultContainerId.collectAsStateWithLifecycle()
-    val containerOsMap by viewModel.containerOsMap.collectAsStateWithLifecycle()
-    val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
-    val tokenStats by viewModel.tokenStats.collectAsStateWithLifecycle()
-    val updateCheckEnabled by viewModel.updateCheckEnabled.collectAsStateWithLifecycle()
-    val updateCheckChannel by viewModel.updateCheckChannel.collectAsStateWithLifecycle()
+    val terminalSettings by viewModel.terminalSettings.collectAsStateWithLifecycle()
     val containerAnnouncementText by viewModel.containerAnnouncementText.collectAsStateWithLifecycle()
     val containerAnnouncementOutdated by viewModel.containerAnnouncementOutdated.collectAsStateWithLifecycle()
-    val imageCatalog by viewModel.imageCatalog.collectAsStateWithLifecycle()
-    val imageDownload by viewModel.containerImageDownload.collectAsStateWithLifecycle()
-    val containerReset by viewModel.containerReset.collectAsStateWithLifecycle()
+    // 镜像源：下载分区与顶层「切换下载源」弹窗共用，低频流，留顶层。
     val imageSourceOptions by viewModel.imageSourceOptions.collectAsStateWithLifecycle()
     val selectedImageSource by viewModel.selectedImageSource.collectAsStateWithLifecycle()
-    val downloadedImages by viewModel.downloadedImages.collectAsStateWithLifecycle()
-    val sourceUnavailableIds by viewModel.sourceUnavailableIds.collectAsStateWithLifecycle()
-    val terminalSettings by viewModel.terminalSettings.collectAsStateWithLifecycle()
-    val proxyConfig by viewModel.proxyConfig.collectAsStateWithLifecycle()
-    val proxyTestState by viewModel.proxyTestState.collectAsStateWithLifecycle()
     var showTerminalSettingsSheet by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -709,39 +680,53 @@ fun SettingsScreen(
                         viewModel.reorderProviders(fromIndex, toIndex)
                     }
                 )
-                SettingsSection.DefaultModels -> DefaultModelsSection(
-                    providers = providers,
-                    visionProviderId = visionProviderId,
-                    visionModel = visionModel,
-                    compactionProviderId = compactionProviderId,
-                    compactionModel = compactionModel,
-                    titleProviderId = titleProviderId,
-                    titleModel = titleModel,
-                    imageGenProviderId = imageGenProviderId,
-                    imageGenModel = imageGenModel,
-                    modelMetadata = modelMetadata,
-                    onLoadMetadata = { viewModel.loadAllModelMetadata() },
-                    onSelectVisionModel = { pid, m -> viewModel.setVisionModel(pid, m) },
-                    onClearVisionModel = { viewModel.clearVisionModel() },
-                    onSelectCompactionModel = { pid, m -> viewModel.setCompactionModel(pid, m) },
-                    onClearCompactionModel = { viewModel.clearCompactionModel() },
-                    onSelectTitleModel = { pid, m -> viewModel.setTitleModel(pid, m) },
-                    onClearTitleModel = { viewModel.clearTitleModel() },
-                    onSelectImageGenModel = { pid, m -> viewModel.setImageGenModel(pid, m) },
-                    onClearImageGenModel = { viewModel.clearImageGenModel() }
-                )
-                SettingsSection.Mcp -> McpSection(
-                    entries = mcpEntries,
-                    statuses = mcpStatuses,
-                    reloading = mcpReloading,
-                    onReload = { viewModel.reloadMcp() },
-                    onToggle = { name, enabled, scope -> viewModel.setMcpServerEnabled(name, enabled, scope) },
-                    onEdit = {
-                        editingMcp = it
-                        showMcpDialog = true
-                    },
-                    onDelete = { name, scope -> viewModel.deleteMcpServer(name, scope) }
-                )
+                SettingsSection.DefaultModels -> {
+                    val visionProviderId by viewModel.visionProviderId.collectAsStateWithLifecycle()
+                    val visionModel by viewModel.visionModel.collectAsStateWithLifecycle()
+                    val compactionProviderId by viewModel.compactionProviderId.collectAsStateWithLifecycle()
+                    val compactionModel by viewModel.compactionModel.collectAsStateWithLifecycle()
+                    val titleProviderId by viewModel.titleProviderId.collectAsStateWithLifecycle()
+                    val titleModel by viewModel.titleModel.collectAsStateWithLifecycle()
+                    val imageGenProviderId by viewModel.imageGenProviderId.collectAsStateWithLifecycle()
+                    val imageGenModel by viewModel.imageGenModel.collectAsStateWithLifecycle()
+                    DefaultModelsSection(
+                        providers = providers,
+                        visionProviderId = visionProviderId,
+                        visionModel = visionModel,
+                        compactionProviderId = compactionProviderId,
+                        compactionModel = compactionModel,
+                        titleProviderId = titleProviderId,
+                        titleModel = titleModel,
+                        imageGenProviderId = imageGenProviderId,
+                        imageGenModel = imageGenModel,
+                        modelMetadata = modelMetadata,
+                        onLoadMetadata = { viewModel.loadAllModelMetadata() },
+                        onSelectVisionModel = { pid, m -> viewModel.setVisionModel(pid, m) },
+                        onClearVisionModel = { viewModel.clearVisionModel() },
+                        onSelectCompactionModel = { pid, m -> viewModel.setCompactionModel(pid, m) },
+                        onClearCompactionModel = { viewModel.clearCompactionModel() },
+                        onSelectTitleModel = { pid, m -> viewModel.setTitleModel(pid, m) },
+                        onClearTitleModel = { viewModel.clearTitleModel() },
+                        onSelectImageGenModel = { pid, m -> viewModel.setImageGenModel(pid, m) },
+                        onClearImageGenModel = { viewModel.clearImageGenModel() }
+                    )
+                }
+                SettingsSection.Mcp -> {
+                    val mcpEntries by viewModel.mcpEntries.collectAsStateWithLifecycle()
+                    val mcpStatuses by viewModel.mcpStatuses.collectAsStateWithLifecycle()
+                    McpSection(
+                        entries = mcpEntries,
+                        statuses = mcpStatuses,
+                        reloading = mcpReloading,
+                        onReload = { viewModel.reloadMcp() },
+                        onToggle = { name, enabled, scope -> viewModel.setMcpServerEnabled(name, enabled, scope) },
+                        onEdit = {
+                            editingMcp = it
+                            showMcpDialog = true
+                        },
+                        onDelete = { name, scope -> viewModel.deleteMcpServer(name, scope) }
+                    )
+                }
                 SettingsSection.Skills -> SkillsSection(
                     projectName = currentProjectName,
                     entries = skills,
@@ -782,105 +767,146 @@ fun SettingsScreen(
                         }
                     )
                 }
-                SettingsSection.Container -> ContainerSection(
-                    profiles = containerProfiles,
-                    activeProfileId = activeProfileId,
-                    defaultContainerId = defaultContainerId,
-                    osMap = containerOsMap,
-                    showAddSheetExternal = showContainerAddSheet,
-                    onDismissAddSheet = { showContainerAddSheet = false },
-                    onSelect = { viewModel.setActiveContainerProfile(it) },
-                    onSetDefaultContainer = { viewModel.setDefaultContainerId(it) },
-                    onSaveCustom = { viewModel.saveCustomContainerProfile(it) },
-                    onEditCustom = { viewModel.editCustomContainerProfile(it) },
-                    onDeleteProfile = { viewModel.deleteContainerProfile(it) },
-                    onSwitchConfirmed = onStopAllAndCloseTerminal,
-                    onResetProfile = { profile ->
-                        // 重置与切换容器同等破坏性：rootfs 整体删掉，AI 会话与终端标签必须全部停掉，
-                        // 否则它们会继续读写正在被删的目录。
-                        onStopAllAndCloseTerminal()
-                        viewModel.resetContainer(profile)
-                    },
-                    resetState = containerReset,
-                    onRestoreBuiltin = { viewModel.restoreBuiltinAlpine() },
-                    remoteConnections = remoteConnections
-                )
-                SettingsSection.ContainerDownloads -> ContainerImageDownloadSection(
-                    catalog = imageCatalog,
-                    state = imageDownload,
-                    downloadedImages = downloadedImages,
-                    sourceUnavailableIds = sourceUnavailableIds,
-                    selectedSourceName = viewModel.sourceDisplayName(selectedImageSource, languageTag),
-                    onDownload = { entry -> viewModel.startContainerImageDownload(entry, selectedImageSource) },
-                    onCancel = { viewModel.cancelContainerImageDownload() },
-                    onImport = { entryId, fileUri -> viewModel.importDownloadedImage(entryId, fileUri) },
-                    onDelete = { entryId -> viewModel.deleteDownloadedImage(entryId) }
-                )
-                SettingsSection.Proxy -> ProxySection(
-                    config = proxyConfig,
-                    testState = proxyTestState,
-                    onTestProxy = viewModel::testProxy,
-                    onSetEnabled = viewModel::setProxyEnabled,
-                    onSetType = viewModel::setProxyType,
-                    onSetHost = viewModel::setProxyHost,
-                    onSetPort = viewModel::setProxyPort,
-                    onSetUsername = viewModel::setProxyUsername,
-                    onSetPassword = viewModel::setProxyPassword,
-                    onSetNoProxy = viewModel::setProxyNoProxy
-                )
-                SettingsSection.Log -> LogSection(
-                    current = logLevel,
-                    onSelect = { viewModel.setLogLevel(it) },
-                    state = logViewerState,
-                    onSelectFile = { viewModel.selectLogFile(it) },
-                    onClearFilter = { viewModel.refreshLogs(filterServerName = null) },
-                    onRefresh = { viewModel.refreshLogs(silent = true) }
-                )
-                SettingsSection.Permissions -> PermissionsSection(
-                    projectName = currentProjectName,
-                    projectRules = projectRules,
-                    globalRules = globalRules,
-                    onDeleteProject = { viewModel.deleteProjectRule(it) },
-                    onPromote = { viewModel.promoteRuleToGlobal(it) },
-                    onDeleteGlobal = { viewModel.deleteGlobalRule(it) }
-                )
-                SettingsSection.AppPermissions -> AppPermissionsSection(
-                    keepaliveEnabled = keepaliveEnabled,
-                    onToggleKeepalive = { viewModel.setKeepaliveEnabled(it) },
-                    screenOnEnabled = screenOnEnabled,
-                    onToggleScreenOn = { viewModel.setScreenOnEnabled(it) },
-                    agentSoundEnabled = agentSoundEnabled,
-                    onToggleAgentSound = { viewModel.setAgentSoundEnabled(it) }
-                )
+                SettingsSection.Container -> {
+                    val containerProfiles by viewModel.profiles.collectAsStateWithLifecycle()
+                    val activeProfileId by viewModel.activeProfileId.collectAsStateWithLifecycle()
+                    val defaultContainerId by viewModel.defaultContainerId.collectAsStateWithLifecycle()
+                    val containerOsMap by viewModel.containerOsMap.collectAsStateWithLifecycle()
+                    val containerReset by viewModel.containerReset.collectAsStateWithLifecycle()
+                    val remoteConnections by viewModel.remoteConnections.collectAsStateWithLifecycle()
+                    ContainerSection(
+                        profiles = containerProfiles,
+                        activeProfileId = activeProfileId,
+                        defaultContainerId = defaultContainerId,
+                        osMap = containerOsMap,
+                        showAddSheetExternal = showContainerAddSheet,
+                        onDismissAddSheet = { showContainerAddSheet = false },
+                        onSelect = { viewModel.setActiveContainerProfile(it) },
+                        onSetDefaultContainer = { viewModel.setDefaultContainerId(it) },
+                        onSaveCustom = { viewModel.saveCustomContainerProfile(it) },
+                        onEditCustom = { viewModel.editCustomContainerProfile(it) },
+                        onDeleteProfile = { viewModel.deleteContainerProfile(it) },
+                        onSwitchConfirmed = onStopAllAndCloseTerminal,
+                        onResetProfile = { profile ->
+                            // 重置与切换容器同等破坏性：rootfs 整体删掉，AI 会话与终端标签必须全部停掉，
+                            // 否则它们会继续读写正在被删的目录。
+                            onStopAllAndCloseTerminal()
+                            viewModel.resetContainer(profile)
+                        },
+                        resetState = containerReset,
+                        onRestoreBuiltin = { viewModel.restoreBuiltinAlpine() },
+                        remoteConnections = remoteConnections
+                    )
+                }
+                SettingsSection.ContainerDownloads -> {
+                    val imageCatalog by viewModel.imageCatalog.collectAsStateWithLifecycle()
+                    val imageDownload by viewModel.containerImageDownload.collectAsStateWithLifecycle()
+                    val downloadedImages by viewModel.downloadedImages.collectAsStateWithLifecycle()
+                    val sourceUnavailableIds by viewModel.sourceUnavailableIds.collectAsStateWithLifecycle()
+                    ContainerImageDownloadSection(
+                        catalog = imageCatalog,
+                        state = imageDownload,
+                        downloadedImages = downloadedImages,
+                        sourceUnavailableIds = sourceUnavailableIds,
+                        selectedSourceName = viewModel.sourceDisplayName(selectedImageSource, languageTag),
+                        onDownload = { entry -> viewModel.startContainerImageDownload(entry, selectedImageSource) },
+                        onCancel = { viewModel.cancelContainerImageDownload() },
+                        onImport = { entryId, fileUri -> viewModel.importDownloadedImage(entryId, fileUri) },
+                        onDelete = { entryId -> viewModel.deleteDownloadedImage(entryId) }
+                    )
+                }
+                SettingsSection.Proxy -> {
+                    val proxyConfig by viewModel.proxyConfig.collectAsStateWithLifecycle()
+                    val proxyTestState by viewModel.proxyTestState.collectAsStateWithLifecycle()
+                    ProxySection(
+                        config = proxyConfig,
+                        testState = proxyTestState,
+                        onTestProxy = viewModel::testProxy,
+                        onSetEnabled = viewModel::setProxyEnabled,
+                        onSetType = viewModel::setProxyType,
+                        onSetHost = viewModel::setProxyHost,
+                        onSetPort = viewModel::setProxyPort,
+                        onSetUsername = viewModel::setProxyUsername,
+                        onSetPassword = viewModel::setProxyPassword,
+                        onSetNoProxy = viewModel::setProxyNoProxy
+                    )
+                }
+                SettingsSection.Log -> {
+                    val logLevel by viewModel.logLevel.collectAsStateWithLifecycle()
+                    val logViewerState by viewModel.logViewerState.collectAsStateWithLifecycle()
+                    LogSection(
+                        current = logLevel,
+                        onSelect = { viewModel.setLogLevel(it) },
+                        state = logViewerState,
+                        onSelectFile = { viewModel.selectLogFile(it) },
+                        onClearFilter = { viewModel.refreshLogs(filterServerName = null) },
+                        onRefresh = { viewModel.refreshLogs(silent = true) }
+                    )
+                }
+                SettingsSection.Permissions -> {
+                    val globalRules by viewModel.globalRules.collectAsStateWithLifecycle()
+                    val projectRules by viewModel.projectRules.collectAsStateWithLifecycle()
+                    PermissionsSection(
+                        projectName = currentProjectName,
+                        projectRules = projectRules,
+                        globalRules = globalRules,
+                        onDeleteProject = { viewModel.deleteProjectRule(it) },
+                        onPromote = { viewModel.promoteRuleToGlobal(it) },
+                        onDeleteGlobal = { viewModel.deleteGlobalRule(it) }
+                    )
+                }
+                SettingsSection.AppPermissions -> {
+                    val keepaliveEnabled by viewModel.keepaliveEnabled.collectAsStateWithLifecycle()
+                    val screenOnEnabled by viewModel.screenOnEnabled.collectAsStateWithLifecycle()
+                    val agentSoundEnabled by viewModel.agentSoundEnabled.collectAsStateWithLifecycle()
+                    AppPermissionsSection(
+                        keepaliveEnabled = keepaliveEnabled,
+                        onToggleKeepalive = { viewModel.setKeepaliveEnabled(it) },
+                        screenOnEnabled = screenOnEnabled,
+                        onToggleScreenOn = { viewModel.setScreenOnEnabled(it) },
+                        agentSoundEnabled = agentSoundEnabled,
+                        onToggleAgentSound = { viewModel.setAgentSoundEnabled(it) }
+                    )
+                }
                 SettingsSection.Backup -> {
                     val backupViewModel: com.aicode.feature.backup.presentation.BackupViewModel =
                         androidx.hilt.navigation.compose.hiltViewModel()
                     BackupSection(viewModel = backupViewModel)
                 }
-                SettingsSection.TokenStats -> TokenStatsSection(
-                    state = tokenStats,
-                    onSelectPeriod = { viewModel.setTokenStatsPeriod(it) },
-                    onSelectPage = { viewModel.setTokenStatsPage(it) },
-                    onSelectProviderPage = { viewModel.setProviderStatsPage(it) },
-                    onSelectModelPage = { viewModel.setModelStatsPage(it) }
-                )
+                SettingsSection.TokenStats -> {
+                    val tokenStats by viewModel.tokenStats.collectAsStateWithLifecycle()
+                    TokenStatsSection(
+                        state = tokenStats,
+                        onSelectPeriod = { viewModel.setTokenStatsPeriod(it) },
+                        onSelectPage = { viewModel.setTokenStatsPage(it) },
+                        onSelectProviderPage = { viewModel.setProviderStatsPage(it) },
+                        onSelectModelPage = { viewModel.setModelStatsPage(it) }
+                    )
+                }
                 SettingsSection.Storage -> storageViewModel?.let { StorageSectionHost(viewModel = it) }
-                SettingsSection.TargetMode -> TargetModeSection(
-                    thresholds = targetModeThresholds,
-                    onSetMaxStepBudget = { viewModel.setTargetMaxStepBudget(it) },
-                    onSetMaxConsecutiveFailures = { viewModel.setTargetMaxConsecutiveFailures(it) }
-                )
+                SettingsSection.TargetMode -> {
+                    val targetModeThresholds by viewModel.targetModeThresholds.collectAsStateWithLifecycle()
+                    TargetModeSection(
+                        thresholds = targetModeThresholds,
+                        onSetMaxStepBudget = { viewModel.setTargetMaxStepBudget(it) },
+                        onSetMaxConsecutiveFailures = { viewModel.setTargetMaxConsecutiveFailures(it) }
+                    )
+                }
                 SettingsSection.ProviderEditor -> {} // 已在上方 early return 处理
                 SettingsSection.SkillEditor -> {} // 已在上方 early return 处理
                 SettingsSection.SubAgentEditor -> {} // 已在上方 early return 处理
                 SettingsSection.RemoteServers -> {} // 已在上方 early return 处理
-                SettingsSection.About -> AboutSection(
-                    updateCheckEnabled = updateCheckEnabled,
-                    updateCheckChannel = updateCheckChannel,
-                    onToggleUpdateCheck = { viewModel.setUpdateCheckEnabled(it) },
-                    onSelectChannel = { viewModel.setUpdateCheckChannel(it) },
-                    onCheckUpdate = { viewModel.checkUpdate(manual = true) }
-                )
+                SettingsSection.About -> {
+                    val updateCheckEnabled by viewModel.updateCheckEnabled.collectAsStateWithLifecycle()
+                    val updateCheckChannel by viewModel.updateCheckChannel.collectAsStateWithLifecycle()
+                    AboutSection(
+                        updateCheckEnabled = updateCheckEnabled,
+                        updateCheckChannel = updateCheckChannel,
+                        onToggleUpdateCheck = { viewModel.setUpdateCheckEnabled(it) },
+                        onSelectChannel = { viewModel.setUpdateCheckChannel(it) },
+                        onCheckUpdate = { viewModel.checkUpdate(manual = true) }
+                    )
+                }
             }
         }
     }
