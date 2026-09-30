@@ -112,7 +112,7 @@ class BackgroundSettingsRepository @Inject constructor(
     }
 
     val glassContentEnabledFlow: Flow<Boolean> = context.backgroundDataStore.data.map {
-        it[GLASS_CONTENT_ENABLED_KEY] ?: true
+        it[GLASS_CONTENT_ENABLED_KEY] ?: false
     }
 
     val waterWaveAnimatedFlow: Flow<Boolean> = context.backgroundDataStore.data.map {

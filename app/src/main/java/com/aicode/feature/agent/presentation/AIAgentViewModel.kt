@@ -220,23 +220,33 @@ class AIAgentViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
+    private var draftPersistJob: Job? = null
+
     fun updateInputDraft(text: String) {
         val id = _currentSessionId.value ?: return
-        val editor = draftPrefs.edit()
         if (text.isEmpty()) {
             _inputDrafts.value = _inputDrafts.value - id
-            editor.remove(id)
-        } else {
-            _inputDrafts.value = _inputDrafts.value + (id to text)
-            editor.putString(id, text)
+            draftPersistJob?.cancel()
+            draftPersistJob = viewModelScope.launch(Dispatchers.IO) {
+                draftPrefs.edit().remove(id).apply()
+            }
+            return
         }
-        editor.apply()
+        _inputDrafts.value = _inputDrafts.value + (id to text)
+        draftPersistJob?.cancel()
+        draftPersistJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(400)
+            draftPrefs.edit().putString(id, text).apply()
+        }
     }
 
     fun clearInputDraft() {
         val id = _currentSessionId.value ?: return
+        draftPersistJob?.cancel()
         _inputDrafts.value = _inputDrafts.value - id
-        draftPrefs.edit().remove(id).apply()
+        viewModelScope.launch(Dispatchers.IO) {
+            draftPrefs.edit().remove(id).apply()
+        }
     }
 
     /**

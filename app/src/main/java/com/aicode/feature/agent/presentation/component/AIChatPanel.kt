@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -90,7 +89,6 @@ import compose.icons.FeatherIcons
 import compose.icons.feathericons.ArrowDown
 import java.io.File
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 
@@ -118,9 +116,6 @@ private const val SCROLL_TO_BOTTOM_BTN_SIZE = 34
 /** 连续新消息的入场错开间隔（ms）与总上限：一次插入很多卡片时不能让最后一张等好几秒。 */
 private const val MESSAGE_ENTRY_STAGGER_MS = 90L
 private const val MESSAGE_ENTRY_MAX_STAGGER_MS = 360L
-
-/** AI 收工后继续逐帧校准的时长（ms）：md 异步解析仍可能改高度，不能一停就收手。 */
-private const val CALIBRATE_TAIL_MS = 1_200L
 
 /** 展开/收起工具卡片后等待 item 高度稳定的最大帧数：diff 渲染、实时输出会分帧长高，
  *  过早读位置会按瞬时高度算出过大的滚动目标（中间位置长卡片展开被滚过头、标题出视口）。 */
@@ -337,10 +332,12 @@ fun AIChatPanel(
     val actionSuggestions by viewModel.actionSuggestions.collectAsStateWithLifecycle()
     val optimizingInput by viewModel.optimizingInput.collectAsStateWithLifecycle()
 
-    var inputText by remember { mutableStateOf("") }
-    val inputDraft by viewModel.inputDraft.collectAsStateWithLifecycle()
-    LaunchedEffect(inputDraft) {
-        if (inputText != inputDraft) inputText = inputDraft
+    val inputState = remember { ChatInputTextState() }
+    LaunchedEffect(currentSessionId) {
+        inputState.text = viewModel.inputDraft.value
+        viewModel.inputDraft.collect { draft ->
+            if (inputState.text != draft) inputState.text = draft
+        }
     }
     var pendingAttachments by remember { mutableStateOf<List<PendingUploadAttachment>>(emptyList()) }
     var messageForMenu by remember { mutableStateOf<AgentUIMessage?>(null) }
@@ -360,7 +357,8 @@ fun AIChatPanel(
     // 横幅/面板/输入框任何形态下最后一条消息都停在悬浮层上方不被遮挡。
     val inputBarBottomReserveDp = 156.dp
     var floatingLayerHeightPx by remember { mutableStateOf(0) }
-    val inputBarReservePx = with(LocalDensity.current) {
+    val density = LocalDensity.current
+    val inputBarReservePx = with(density) {
         (if (floatingLayerHeightPx > 0) floatingLayerHeightPx + FLOATING_LAYER_GAP_DP.toPx()
         else inputBarBottomReserveDp.toPx()).toInt()
     }
@@ -388,10 +386,6 @@ fun AIChatPanel(
 
     val providerBalances by (settingsViewModel?.providerBalances?.collectAsStateWithLifecycle() ?: remember { mutableStateOf(emptyMap()) })
     val currentBalanceState = activeProvider?.let { providerBalances[it.id] } ?: ProviderBalanceState.Idle
-
-    // 键盘弹出时收起面板，避免输入框被挤压
-    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
-    val imeVisible = imeBottomPx > 0
 
     // 余额面板展开状态：展开时叠加面板联动折叠，避免输入框被双重顶开
     var balanceExpanded by rememberSaveable { mutableStateOf(false) }
@@ -607,9 +601,9 @@ fun AIChatPanel(
     val voiceController = remember {
         ChatVoiceInputController(
             context = context,
-            onPartialPreview = { partial -> inputText = partial },
+            onPartialPreview = { partial -> inputState.text = partial },
             onFinal = { final ->
-                inputText = final
+                inputState.text = final
                 viewModel.updateInputDraft(final)
             },
             onError = { error ->
@@ -627,7 +621,7 @@ fun AIChatPanel(
     val voicePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) voiceController.start(inputText)
+        if (granted) voiceController.start(inputState.text)
         else Toast.makeText(context, context.getString(R.string.chat_voice_permission_denied), Toast.LENGTH_SHORT).show()
     }
     fun toggleVoice() {
@@ -641,7 +635,7 @@ fun AIChatPanel(
                 context, android.Manifest.permission.RECORD_AUDIO
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
-            voiceController.start(inputText)
+            voiceController.start(inputState.text)
         } else {
             voicePermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
         }
@@ -770,7 +764,7 @@ fun AIChatPanel(
     }
 
     val sendMessage: () -> Unit = {
-        val text = inputText.trim()
+        val text = inputState.text.trim()
         if (text.isNotEmpty() || pendingAttachments.isNotEmpty()) {
             val attachments = pendingAttachments
             val modelSupportsVision = activeModelMetadata?.supportsVision == true
@@ -788,7 +782,7 @@ fun AIChatPanel(
                 inputImages = images,
                 inputAttachments = attachments.toAgentAttachments()
             )
-            inputText = ""
+            inputState.text = ""
             viewModel.clearInputDraft()
             pendingAttachments = emptyList()
             followBottom = true
@@ -822,7 +816,6 @@ fun AIChatPanel(
     // 只向下校准：内容变矮（流式结束、折叠）时保持当前位置，避免「往回滚」与拉锯。
     // reserve 经 State 传递：下面这个 lambda 只创建一次，直接捕获局部 Int 会一直用首帧的兜底值。
     val reservePxState = rememberUpdatedState(inputBarReservePx)
-    val busyState = rememberUpdatedState(isBusy)
     val calibrateToAnchor: suspend () -> Unit = remember(listState) {
         {
             // 无向下滚动空间（内容不满屏或已滚到锚点）：最后内容必然在安全区上方，无需校准。
@@ -843,35 +836,22 @@ fun AIChatPanel(
         }
     }
 
-    // 只在「跟随中且内容可能还在动」时逐帧校准。原来是无条件 while(true)，followBottom
-    // 为 false 也只 continue、帧回调照旧注册，等于让主线程全程每帧醒一次（空闲也在耗电）。
-    LaunchedEffect(listState, messagesReady) {
-        if (!messagesReady) return@LaunchedEffect
-        snapshotFlow { followBottom && (busyState.value || listState.isScrollInProgress) }
-            .collectLatest { active ->
-                if (active) {
-                    while (true) {
-                        withFrameNanos { }
-                        calibrateToAnchor()
-                    }
-                } else {
-                    // 收工那一刻内容未必已稳定（md 异步解析往往落在后面），再兜一小段再收手。
-                    val deadline = System.nanoTime() + CALIBRATE_TAIL_MS * 1_000_000L
-                    while (System.nanoTime() < deadline) {
-                        withFrameNanos { }
-                        calibrateToAnchor()
-                    }
-                }
-            }
-    }
-
-    // 内容变化信号旁路：文本/思考/消息条数变化时立即校准一次，不等下一帧——
-    // 与常驻校准循环互为补充，覆盖「无动画帧」的间隙，杜绝跟丢窗口。
+    // 文本、条数或最后一项高度变化时校准贴底；忙碌时不再 while(true) 抢每一帧。
     LaunchedEffect(listState, messagesReady) {
         if (!messagesReady) return@LaunchedEffect
         snapshotFlow {
-            Triple(streamingText?.length, streamingReasoning?.length, messages.size)
-        }.collect { calibrateToAnchor() }
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+            listOf(
+                streamingText?.length ?: 0,
+                streamingReasoning?.length ?: 0,
+                messages.size,
+                last?.index,
+                last?.size,
+                last?.offset,
+            )
+        }.collect {
+            if (followBottom) calibrateToAnchor()
+        }
     }
 
     val firstVisibleItemIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
@@ -1039,6 +1019,15 @@ fun AIChatPanel(
                             viewModel.clearPendingJump()
                         }
                     }
+                    val liveOutputs = remember(runningTool) {
+                        runningTool.associate { it.messageId to it.text }
+                    }
+                    val onRewindClick = remember(viewModel) {
+                        { messageId: String -> viewModel.openRewindMenu(messageId) }
+                    }
+                    val onMoreClick = remember {
+                        { message: AgentUIMessage -> messageForMenu = message }
+                    }
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -1046,22 +1035,21 @@ fun AIChatPanel(
                             start = Spacing.lg,
                             end = Spacing.lg,
                             top = Spacing.md,
-                            bottom = with(LocalDensity.current) { inputBarReservePx.toDp() }
+                            bottom = with(density) { inputBarReservePx.toDp() }
                         )
                     ) {
                         itemsIndexed(chatItems, key = { _, it -> it.key }, contentType = { _, it -> it.contentType }) { index, item ->
                             val message = item.message
-                            val live = runningTool.firstOrNull { it.messageId == message.id }?.text
                             AgentMessageItem(
                                 message = message,
-                                liveOutput = live,
+                                liveOutput = liveOutputs[message.id],
                                 markdownCache = markdownCache,
                                 contentSlice = item.slice,
                                 isChunkHeader = item.isChunkHeader,
                                 isChunkFooter = item.isChunkFooter,
                                 isHighlighted = message.id == highlightMessageId,
-                                onRewindClick = { viewModel.openRewindMenu(it) },
-                                onMoreClick = { messageForMenu = it },
+                                onRewindClick = onRewindClick,
+                                onMoreClick = onMoreClick,
                                 onToolToggle = {
                                     // 用户主动展开/收起工具卡片：先暂停自动跟随，避免校准循环把视口拉走造成跳动；
                                     // 用户滚回底部（isAtBottom 监测）时自动恢复跟随。
@@ -1250,15 +1238,15 @@ fun AIChatPanel(
                 ActionSuggestionsRow(
                     suggestions = actionSuggestions,
                     onSelected = { suggestion ->
-                        inputText = suggestion
+                        inputState.text = suggestion
                         viewModel.updateInputDraft(suggestion)
                     }
                 )
             }
 
             ChatInputBar(
-                value = inputText,
-                onValueChange = { inputText = it; viewModel.updateInputDraft(it) },
+                inputState = inputState,
+                onDraftChange = { viewModel.updateInputDraft(it) },
                 onSend = sendMessage,
                 onStop = { viewModel.stopAgent() },
                 isBusy = isBusy,
@@ -1295,7 +1283,7 @@ fun AIChatPanel(
                 queuedRequests = queuedRequests,
                 onRemoveQueued = { viewModel.removeQueuedRequest(it) },
                 balanceState = currentBalanceState,
-                forceCollapseBalance = pendingPermission != null || pendingQuestion != null || planApproval != null || imeVisible,
+                forceCollapseBalance = pendingPermission != null || pendingQuestion != null || planApproval != null,
                 onBalanceExpandedChange = { balanceExpanded = it },
                 onRefreshBalance = {
                     activeProvider?.let {
@@ -1379,7 +1367,7 @@ fun AIChatPanel(
                     promptSnippet = targetMsg?.content ?: "",
                     onOptionSelected = { option ->
                         viewModel.executeRewindOption(targetId, option) { text, attachments ->
-                            inputText = text
+                            inputState.text = text
                             pendingAttachments = attachments.map { it.toPendingAttachment() }
                         }
                     },

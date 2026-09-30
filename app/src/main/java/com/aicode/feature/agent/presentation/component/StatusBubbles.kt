@@ -218,7 +218,7 @@ private const val TYPEWRITER_CATCHUP_PER_SEC = 0.5f
 private const val TYPEWRITER_RATE_WINDOW_MS = 500L
 
 /** 打字机渲染节流间隔（ms）：Markdown 解析频率上限约 1/间隔。 */
-private const val TYPEWRITER_RENDER_INTERVAL_MS = 100L
+private const val TYPEWRITER_RENDER_INTERVAL_MS = 200L
 
 /** 按码点数量截断字符串，避免把 emoji 等代理对截成孤立的半个字符。 */
 private fun truncateToCodePoints(text: String, codePoints: Int): String {

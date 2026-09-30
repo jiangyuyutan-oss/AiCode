@@ -31,7 +31,7 @@ data class GlassSettings(
             mode = GlassMode.FROSTED,
             sidebarEnabled = true,
             inputEnabled = true,
-            contentEnabled = true,
+            contentEnabled = false,
             radiusDp = 16f,
             waterWaveAnimated = false,
         )

@@ -53,22 +53,22 @@ class BackgroundGlassSettingsRepositoryTest {
 
     @Test
     fun glassState_writeReadAndAggregateInOrder() = runTest {
-        // 重置到默认基准：总开关关、磨砂档、三区域开、动画关
+        // 重置到默认基准：总开关关、磨砂档、侧栏/输入开、内容面板关、动画关
         repo.setGlassEnabled(false)
         repo.setGlassMode(GlassMode.FROSTED)
         repo.setGlassPanelAreaEnabled(GlassPanelArea.SIDEBAR, true)
         repo.setGlassPanelAreaEnabled(GlassPanelArea.INPUT, true)
-        repo.setGlassPanelAreaEnabled(GlassPanelArea.CONTENT, true)
+        repo.setGlassPanelAreaEnabled(GlassPanelArea.CONTENT, false)
         repo.setWaterWaveAnimated(false)
         repo.setFrostIntensity(BackgroundSettingsRepository.DEFAULT_FROST_INTENSITY)
 
-        // 默认态聚合：关闭、磨砂、半径 = 0.5 × 32
+        // 默认态聚合：关闭、磨砂、半径 = 0.5 × 32；内容面板默认关以免滚动时全屏玻璃重绘
         val defaults = repo.glassStateFlow.first()
         assertEquals(false, defaults.enabled)
         assertEquals(GlassMode.FROSTED, defaults.mode)
         assertEquals(true, defaults.sidebarEnabled)
         assertEquals(true, defaults.inputEnabled)
-        assertEquals(true, defaults.contentEnabled)
+        assertEquals(false, defaults.contentEnabled)
         assertEquals(
             BackgroundSettingsRepository.DEFAULT_FROST_INTENSITY * GlassSettings.MAX_RADIUS_DP,
             defaults.radiusDp,
@@ -87,7 +87,7 @@ class BackgroundGlassSettingsRepositoryTest {
         assertEquals(GlassMode.LIQUID, custom.mode)
         assertEquals(false, custom.sidebarEnabled)
         assertEquals(true, custom.inputEnabled)
-        assertEquals(true, custom.contentEnabled)
+        assertEquals(false, custom.contentEnabled)
         assertEquals(0.25f * GlassSettings.MAX_RADIUS_DP, custom.radiusDp, 1e-4f)
         assertEquals(true, custom.waterWaveAnimated)
 

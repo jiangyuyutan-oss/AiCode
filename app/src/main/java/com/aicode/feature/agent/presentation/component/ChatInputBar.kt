@@ -106,10 +106,15 @@ import kotlinx.coroutines.launch
 /** 输入框区域蒙版高度：盖住圆角容器，滚动内容滑入时被渐变遮罩；随键盘（IME）上移。 */
 private val INPUT_BAR_MASK_HEIGHT = 110.dp
 
+/** 输入框文本与聊天页其它状态隔离：按键只重组输入栏，不带动整页消息列表。 */
+internal class ChatInputTextState {
+    var text by mutableStateOf("")
+}
+
 @Composable
 internal fun ChatInputBar(
-    value: String,
-    onValueChange: (String) -> Unit,
+    inputState: ChatInputTextState,
+    onDraftChange: (String) -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
     isBusy: Boolean,
@@ -152,12 +157,19 @@ internal fun ChatInputBar(
     onModelSheetDismiss: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val value = inputState.text
+    fun applyValue(next: String) {
+        inputState.text = next
+        onDraftChange(next)
+    }
     val hasContent = value.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = hasContent
     val glass = LocalGlassSettings.current
     val inputGlassOn = glass.enabled &&
         glass.isEnabled(GlassPanelArea.INPUT) &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    val imeInset = rememberImeBottomInset()
+    val collapseBalance = forceCollapseBalance || imeInset > 0.dp
     var showAttachmentSheet by remember { mutableStateOf(false) }
     val showSlashMenu = !isBusy && slashCommands.isNotEmpty() &&
         value.startsWith("/") && !value.contains("\n")
@@ -170,7 +182,6 @@ internal fun ChatInputBar(
         color = Color.Transparent,
         modifier = modifier.fillMaxWidth()
     ) {
-        val imeInset = rememberImeBottomInset()
         // 滚动弱化：内容区（slash 菜单/排队面板/输入框本体）整体淡出，蒙版渐变保持不透明（同 git 页 tab 栏）。
         val contentAlpha by animateFloatAsState(
             targetValue = if (isScrolling) 0.4f else 1f,
@@ -232,7 +243,7 @@ internal fun ChatInputBar(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(Radius.sm))
-                                    .clickable { onValueChange(command.trigger) }
+                                    .clickable { applyValue(command.trigger) }
                                     .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -271,7 +282,7 @@ internal fun ChatInputBar(
                     onRefresh = onRefreshBalance,
                     onRefreshByButton = onRefreshBalanceByButton,
                     onExpandedChange = onBalanceExpandedChange,
-                    forceCollapse = forceCollapseBalance
+                    forceCollapse = collapseBalance
                 )
             }
 
@@ -300,7 +311,7 @@ internal fun ChatInputBar(
 
                 TextField(
                     value = value,
-                    onValueChange = onValueChange,
+                    onValueChange = ::applyValue,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 44.dp, max = 140.dp),
