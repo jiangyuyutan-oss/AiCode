@@ -2,7 +2,6 @@ package com.aicode.feature.settings.presentation.component
 
 import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,17 +33,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicode.R
 import com.aicode.core.theme.Spacing
-import com.aicode.core.ui.AppSwitch
-import com.aicode.core.ui.SegmentedTabs
-import com.aicode.core.ui.glass.GlassMode
-import com.aicode.core.ui.glass.GlassPanelArea
-import com.aicode.core.ui.glass.GlassSettings
 import com.aicode.feature.settings.data.repository.BackgroundSettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -81,20 +73,12 @@ internal fun decodeBackgroundBitmap(path: String, maxWidth: Int, maxHeight: Int)
 internal fun BackgroundImageSheet(
     imagePath: String?,
     alpha: Float,
-    frostIntensity: Float,
     onPickImage: (Uri) -> Unit,
     onAlphaChange: (Float) -> Unit,
-    onFrostIntensityChange: (Float) -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
-    glassState: GlassSettings = GlassSettings.DISABLED,
-    onGlassEnabledChange: (Boolean) -> Unit = {},
-    onGlassModeChange: (GlassMode) -> Unit = {},
-    onGlassAreaEnabledChange: (GlassPanelArea, Boolean) -> Unit = { _, _ -> },
-    onWaterWaveAnimatedChange: (Boolean) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState()
-    val context = LocalContext.current
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri -> if (uri != null) onPickImage(uri) }
@@ -111,9 +95,6 @@ internal fun BackgroundImageSheet(
     // 滑块位置由本地状态驱动：直接绑外部 alpha 会让每次拖动都走「写 DataStore → 回读 → 整个设置页重组」
     // 的往返，滑块因此跟不上手指。弹窗每次打开都重建，初值取当前设置即可。
     var sliderPercent by remember { mutableFloatStateOf(BackgroundSettingsRepository.alphaToSlider(alpha)) }
-    var frostPercent by remember {
-        mutableFloatStateOf(BackgroundSettingsRepository.frostToSlider(frostIntensity))
-    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -172,117 +153,6 @@ internal fun BackgroundImageSheet(
                 valueRange = 0f..100f
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.settings_background_frost_intensity),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "${frostPercent.toInt()}%",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            Slider(
-                value = frostPercent,
-                onValueChange = { percent ->
-                    frostPercent = percent
-                    onFrostIntensityChange(BackgroundSettingsRepository.sliderToFrost(percent))
-                },
-                valueRange = 0f..100f
-            )
-
-            Spacer(Modifier.height(Spacing.lg))
-            Text(
-                text = stringResource(R.string.settings_glass_title),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = Spacing.md)
-            )
-            val glassSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-            if (!glassSupported) {
-                Text(
-                    text = stringResource(R.string.settings_glass_unsupported),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = stringResource(R.string.settings_glass_enabled),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    AppSwitch(
-                        checked = glassState.enabled,
-                        onCheckedChange = onGlassEnabledChange
-                    )
-                }
-                if (glassState.enabled) {
-                    Spacer(Modifier.height(Spacing.md))
-                    Text(
-                        text = stringResource(R.string.settings_glass_mode),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(bottom = Spacing.xs)
-                    )
-                    SegmentedTabs(
-                        selected = glassState.mode.ordinal,
-                        labels = listOf(
-                            stringResource(R.string.settings_glass_mode_frosted),
-                            stringResource(R.string.settings_glass_mode_water),
-                            stringResource(R.string.settings_glass_mode_liquid),
-                        ),
-                        onSelect = { idx ->
-                            onGlassModeChange(GlassMode.entries[idx])
-                        }
-                    )
-                    Spacer(Modifier.height(Spacing.md))
-                    GlassAreaToggle(
-                        label = R.string.settings_glass_area_sidebar,
-                        checked = glassState.sidebarEnabled,
-                        onCheckedChange = { onGlassAreaEnabledChange(GlassPanelArea.SIDEBAR, it) }
-                    )
-                    GlassAreaToggle(
-                        label = R.string.settings_glass_area_input,
-                        checked = glassState.inputEnabled,
-                        onCheckedChange = { onGlassAreaEnabledChange(GlassPanelArea.INPUT, it) }
-                    )
-                    GlassAreaToggle(
-                        label = R.string.settings_glass_area_content,
-                        checked = glassState.contentEnabled,
-                        onCheckedChange = { onGlassAreaEnabledChange(GlassPanelArea.CONTENT, it) }
-                    )
-                    if (glassState.mode == GlassMode.WATER) {
-                        Spacer(Modifier.height(Spacing.sm))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = stringResource(R.string.settings_glass_water_animated),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f)
-                            )
-                            AppSwitch(
-                                checked = glassState.waterWaveAnimated,
-                                onCheckedChange = onWaterWaveAnimatedChange
-                            )
-                        }
-                    }
-                }
-            }
             Spacer(Modifier.height(Spacing.lg))
 
             Row(
@@ -313,26 +183,5 @@ internal fun BackgroundImageSheet(
                 }
             }
         }
-    }
-}
-
-/** 玻璃区域开关行：标签 + AppSwitch。 */
-@Composable
-private fun GlassAreaToggle(
-    @androidx.annotation.StringRes label: Int,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-    ) {
-        Text(
-            text = stringResource(label),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f)
-        )
-        AppSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -44,9 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
@@ -70,16 +67,9 @@ import com.aicode.core.ui.SharePayloadHolder
 import com.aicode.core.ui.VerticalSplitHandle
 import com.aicode.core.ui.drawerWidth
 import com.aicode.core.ui.isExpandedWidth
-import com.aicode.core.ui.glass.GlassPanelArea
-import com.aicode.core.ui.glass.LocalGlassSettings
-import com.aicode.core.ui.glass.glassPanel
-import com.aicode.core.ui.glass.isEnabled
 import com.aicode.core.ui.pageEnter
 import com.aicode.core.ui.pageExit
 import com.aicode.core.ui.parseShareIntent
-import com.aicode.core.ui.glass.GlassSettings
-import com.aicode.core.ui.glass.LocalBackdrop
-import com.aicode.core.ui.glass.LocalGlassSettings
 import com.aicode.feature.agent.presentation.AIAgentViewModel
 import com.aicode.feature.agent.presentation.component.AIChatPanel
 import com.aicode.feature.agent.presentation.component.ChatDrawerContent
@@ -109,8 +99,6 @@ import com.aicode.feature.settings.presentation.component.decodeBackgroundBitmap
 import com.aicode.feature.settings.presentation.component.openUrl
 import com.aicode.feature.settings.presentation.component.settingsPageBackground
 import com.aicode.feature.terminal.domain.TerminalKeepaliveService
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.aicode.feature.terminal.presentation.TerminalViewModel
 import com.aicode.feature.terminal.presentation.component.TerminalScreen
 import com.aicode.feature.workspace.presentation.WorkspaceViewModel
@@ -244,57 +232,37 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    // 全局自定义背景图：绘制在页面内容之下，透明度与磨砂强度可调。
+                    // 全局自定义背景图：绘制在页面内容之下，透明度可调（水印效果，不拦截触摸）。
                     val bgPath by backgroundSettings.imagePathFlow.collectAsStateWithLifecycle(initialValue = null)
                     val bgAlpha by backgroundSettings.alphaFlow.collectAsStateWithLifecycle(initialValue = BackgroundSettingsRepository.DEFAULT_ALPHA)
-                    val frostIntensity by backgroundSettings.frostIntensityFlow.collectAsStateWithLifecycle(
-                        initialValue = BackgroundSettingsRepository.DEFAULT_FROST_INTENSITY
-                    )
-                    // 玻璃材质：壁纸层标记为 backdrop 源（垫窗口底色防透明像素），配置经 CompositionLocal 下发。
-                    val glassSettings by backgroundSettings.glassStateFlow.collectAsStateWithLifecycle(
-                        initialValue = GlassSettings.DISABLED
-                    )
-                    val glassBaseColor = MaterialTheme.colorScheme.background
-                    val glassBaseColorState = androidx.compose.runtime.rememberUpdatedState(glassBaseColor)
-                    val glassBackdrop = rememberLayerBackdrop {
-                        drawRect(glassBaseColorState.value)
-                        drawContent()
-                    }
-                    androidx.compose.runtime.CompositionLocalProvider(
-                        LocalGlassSettings provides glassSettings,
-                        LocalBackdrop provides glassBackdrop
-                    ) {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            if (bgPath != null && bgAlpha > 0f) {
-                                val screen = LocalView.current
-                                val bitmap by produceState<ImageBitmap?>(initialValue = null, bgPath) {
-                                    value = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                                        decodeBackgroundBitmap(
-                                            bgPath!!,
-                                            screen.width.coerceAtLeast(1),
-                                            screen.height.coerceAtLeast(1)
-                                        )
-                                    }
-                                }
-                                bitmap?.let {
-                                    Image(
-                                        bitmap = it,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .blur((frostIntensity * 32f).dp)
-                                            .alpha(bgAlpha)
-                                            .layerBackdrop(glassBackdrop)
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (bgPath != null && bgAlpha > 0f) {
+                            val screen = LocalView.current
+                            val bitmap by produceState<ImageBitmap?>(initialValue = null, bgPath) {
+                                value = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                                    decodeBackgroundBitmap(
+                                        bgPath!!,
+                                        screen.width.coerceAtLeast(1),
+                                        screen.height.coerceAtLeast(1)
                                     )
                                 }
                             }
-                            AppNavigation(onboardingRepository = onboardingRepository)
-                            // 全局凭据弹窗：覆盖所有页面，命令行 git 缺凭据在任意页面都能弹。
-                            com.aicode.feature.credentials.presentation.component.GlobalCredentialDialogHost(
-                                bridge = credentialRequestBridge
-                            )
+                            bitmap?.let {
+                                Image(
+                                    bitmap = it,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .alpha(bgAlpha)
+                                )
+                            }
                         }
+                        AppNavigation(onboardingRepository = onboardingRepository)
+                        // 全局凭据弹窗：覆盖所有页面，命令行 git 缺凭据在任意页面都能弹。
+                        com.aicode.feature.credentials.presentation.component.GlobalCredentialDialogHost(
+                            bridge = credentialRequestBridge
+                        )
                     }
                 }
             }
@@ -386,12 +354,6 @@ fun AppNavigation(
         // 图片由 AIChatPanel 的 pendingShareImages 入参消费；无图片时直接清空中转站。
         if (payload.imageUris.isEmpty()) SharePayloadHolder.consume()
     }
-
-    // 玻璃材质：侧栏/输入框/内容面板按区域开关短路，glassPanel 内部再兜底总开关与 API33 门槛。
-    val glass = LocalGlassSettings.current
-    val sidebarGlassOn = glass.enabled &&
-        glass.isEnabled(GlassPanelArea.SIDEBAR) &&
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     // ── 首次启动引导 ──
     val onboardingStateHolder = remember { OnboardingStateHolder() }
@@ -804,11 +766,6 @@ fun AppNavigation(
                         modifier = Modifier
                             .width(drawerWidth())
                             .fillMaxHeight()
-                            .then(
-                                if (sidebarGlassOn) Modifier.glassPanel(
-                                    RoundedCornerShape(0.dp), GlassPanelArea.SIDEBAR
-                                ) else Modifier
-                            )
                     ) {
                         sidebarStateHolder.SaveableStateProvider("chat-sidebar") {
                             drawerBody()
@@ -829,15 +786,10 @@ fun AppNavigation(
             drawerContent = {
                 ModalDrawerSheet(
                     drawerShape = RectangleShape,
-                    drawerContainerColor = if (sidebarGlassOn) Color.Transparent else settingsPageBackground(),
+                    drawerContainerColor = settingsPageBackground(),
                     drawerTonalElevation = 0.dp,
                     modifier = Modifier
                         .width(drawerWidth())
-                        .then(
-                            if (sidebarGlassOn) Modifier.glassPanel(
-                                RoundedCornerShape(0.dp), GlassPanelArea.SIDEBAR
-                            ) else Modifier
-                        )
                 ) {
                     drawerBody()
                 }

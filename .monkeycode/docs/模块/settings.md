@@ -15,7 +15,7 @@ feature/settings/
 │   │   │   ├── KeepaliveSettingsRepository.kt
 │   │   │   ├── ThemeSettingsRepository.kt / LanguageSettingsRepository.kt
 │   │   │   ├── ProxySettingsRepository.kt / LogSettingsRepository.kt
-│   │   │   ├── BackgroundSettingsRepository.kt  # 背景图/磨砂 + 玻璃材质 6 键聚合
+│   │   │   ├── BackgroundSettingsRepository.kt  # 背景图路径/透明度
 │   │   │   └── ContainerSettingsRepository.kt / SyncSettingsRepository.kt / ...
 │   ├── ExecutionModeHolder.kt               # 模式内存 StateFlow 缓存（委托层分发依据）
 │   ├── ProviderKeyRotator.kt                # 多 Key 轮换/冷却
@@ -35,7 +35,7 @@ feature/settings/
 | `ExecutionModeHolder.kt` | 执行模式的内存 StateFlow，启动时从 repository 读首帧值；`DelegatingCommandEngine` / `DelegatingFileAccess` / `DelegatingTerminalSessionProvider` 同步读取 |
 | `ProviderKeyRotator.kt` | 同一 provider 多 Key 自动轮换，失效 Key 冷却 |
 | `data/remote/ModelApiService.kt` | 模型连通性测试：`testModel` 发极短 "hi" 请求验证 Key+模型+端点（OpenAI/Anthropic/Gemini 三协议）；`SettingsViewModel.testAllModels` 限并发 4（`Semaphore`）批量测当前 provider 全部模型，`BatchTestState` 聚合 total/done/success，`stopAllModels` 取消 |
-| `data/repository/BackgroundSettingsRepository.kt` | 背景图路径/透明度/磨砂强度 + 玻璃材质 6 键（总开关/档位/三区域开关/水波动画），`glassStateFlow` 聚合（半径 = `frost_intensity` × 32，零 Room 迁移） |
+| `data/repository/BackgroundSettingsRepository.kt` | 背景图路径/透明度（图片拷贝进私有目录持久化，DataStore 存路径与 alpha，零 Room 迁移） |
 | `data/remote/UpdateCheckService.kt` | GitHub Release 更新检查 |
 
 ## 依赖
@@ -56,8 +56,6 @@ feature/settings/
 **执行模式切换**：改模式必须经 `ExecutionModeRepository` → `ExecutionModeHolder`，保证三个委托层即时感知；不要在各处缓存模式快照。
 
 **模型连通性测试**：单测 `ModelApiService.testModel` 发极短 "hi" 请求验证 Key+模型+端点；批量 `testAllModels(provider)` 限并发 4（`Semaphore.withPermit`）测当前 provider 模型列表全部模型，逐条复用 `_testing`/`_testResults`（每行实时反映），`BatchTestState` 聚合 total/done/success（完成后仍保留摘要，编辑页按 `total > 0` 展示）。`stopAllModels` / `resetModelTests` 递增 `modelTestEpoch` 后取消 job，丢弃迟到的 OkHttp 结果，避免退出编辑页后残留 running / 结果回写。进入、退出 `ProviderEditorScreen` 都调 `resetModelTests` 刷新到空白状态。
-
-**玻璃材质配置**：`BackgroundSettingsRepository` 在既有 `background_prefs` 加 6 个玻璃键 + `glassStateFlow` 聚合（复用 `frost_intensity` × 32 换算半径，零 Room 迁移）；UI 侧 `glassPanel` Modifier 从 `LocalGlassSettings`/`LocalBackdrop` 读配置与壁纸源（见 [core 模块](./core.md)），三区域（侧边栏/输入框/内容面板）接线在 MainActivity 与 AIChatPanel/ChatInputBar。
 
 ### 敏感信息
 

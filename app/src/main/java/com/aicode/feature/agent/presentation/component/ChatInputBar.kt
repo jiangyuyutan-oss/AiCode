@@ -1,7 +1,6 @@
 package com.aicode.feature.agent.presentation.component
 
 import android.content.ClipData
-import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -44,10 +43,6 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import com.aicode.core.ui.glass.GlassPanelArea
-import com.aicode.core.ui.glass.LocalGlassSettings
-import com.aicode.core.ui.glass.glassPanel
-import com.aicode.core.ui.glass.isEnabled
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -164,10 +159,6 @@ internal fun ChatInputBar(
     }
     val hasContent = value.isNotBlank() || pendingAttachments.isNotEmpty()
     val canSend = hasContent
-    val glass = LocalGlassSettings.current
-    val inputGlassOn = glass.enabled &&
-        glass.isEnabled(GlassPanelArea.INPUT) &&
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     val imeInset = rememberImeBottomInset()
     val collapseBalance = forceCollapseBalance || imeInset > 0.dp
     var showAttachmentSheet by remember { mutableStateOf(false) }
@@ -290,13 +281,7 @@ internal fun ChatInputBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(Radius.lg))
-                    .then(
-                        if (inputGlassOn) {
-                            Modifier.glassPanel(RoundedCornerShape(Radius.lg), GlassPanelArea.INPUT)
-                        } else {
-                            Modifier.background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
-                        }
-                    )
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.98f))
                     .border(
                         1.dp,
                         MaterialTheme.colorScheme.outlineVariant,

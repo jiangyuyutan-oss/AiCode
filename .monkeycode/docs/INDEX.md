@@ -26,7 +26,7 @@ AI 工具系统（19 个内置工具 + 扩展点）、LLM Provider 适配（Open
 | `feature/agent/` | AI Agent 核心：workflow 状态机、工具系统、权限引擎、MCP、检查点、子代理 | [agent](./模块/agent.md) |
 | `feature/terminal/` | 终端会话（本地 PRoot / 远程 SSH 统一抽象）+ 进程保活 | [terminal](./模块/terminal.md) |
 | `feature/workspace/` | 工作区管理、文件访问后端、SAF Provider、SFTP/FTP 同步 | [workspace](./模块/workspace.md) |
-| `feature/settings/` | Provider 管理、执行模式、模型连通性批量测试、玻璃材质配置、20+ 分域 DataStore 设置 | [settings](./模块/settings.md) |
+| `feature/settings/` | Provider 管理、执行模式、模型连通性批量测试、20+ 分域 DataStore 设置 | [settings](./模块/settings.md) |
 | `feature/editor/` | sora-editor 封装、TextMate 语法高亮、编码检测 | [editor](./模块/editor.md) |
 | `feature/git/` | 容器内命令行 git 的可视化封装（状态/分支/历史/diff） | [git](./模块/git.md) |
 | `feature/backup/` | tar.gz + AES-GCM 加密备份恢复（流式） | [backup](./模块/backup.md) |
