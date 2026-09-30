@@ -57,6 +57,8 @@ feature/settings/
 
 **模型连通性测试**：单测 `ModelApiService.testModel` 发极短 "hi" 请求验证 Key+模型+端点；批量 `testAllModels(provider)` 限并发 4（`Semaphore.withPermit`）测当前 provider 模型列表全部模型，逐条复用 `_testing`/`_testResults`（每行实时反映），`BatchTestState` 聚合 total/done/success（完成后仍保留摘要，编辑页按 `total > 0` 展示）。`stopAllModels` / `resetModelTests` 递增 `modelTestEpoch` 后取消 job，丢弃迟到的 OkHttp 结果，避免退出编辑页后残留 running / 结果回写。进入、退出 `ProviderEditorScreen` 都调 `resetModelTests` 刷新到空白状态。
 
+**设置页状态收集分层**：`SettingsScreen` 顶层只订阅菜单/跨分区共享或被顶层 `LaunchedEffect` 读取的状态；只被单一分区消费的 StateFlow 改到各自 `AnimatedContent` 分支内 `collectAsStateWithLifecycle`。否则聊天进行中的 tokenStats、MCP 状态、镜像下载、代理测试等后台流每次发射都会重组整页、打断分区切换动画。
+
 ### 敏感信息
 
 `AIProviderEntity.apiKey` 明文存 Room（本地 App 私有目录）；备份导出走 [backup 模块](./backup.md) 的 AES-GCM 加密。

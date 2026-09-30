@@ -19,7 +19,8 @@ feature/terminal/
 └── presentation/
     ├── TerminalScreen.kt / TerminalViewModel.kt
     ├── TerminalClients.kt                  # AppTerminalSessionClient 接 session 回调
-    └── TerminalSettingsSheet.kt
+    ├── TerminalSettingsSheet.kt
+    └── component/ContainerPreviewDialog.kt # 容器内 Web 服务预览（WebView，仅本地模式）
 ```
 
 ## 关键文件
@@ -31,6 +32,7 @@ feature/terminal/
 | `domain/SshShellBackend.kt` | 远程的关键粘合层：把 sshj `Session.Shell` 包装成 Termux emulator 的输入/输出/resize |
 | `domain/TerminalKeepaliveService.kt` | 前台低优先级通知；会话计数归零自动停；`onTaskRemoved` 划卡即停 |
 | `domain/KeepaliveWorker.kt` | WorkManager 周期探测保活 Service 被杀则拉起 |
+| `presentation/component/ContainerPreviewDialog.kt` | 容器内 Web 服务预览：顶栏 Monitor 图标进入，先弹端口输入框（校验 1..65535，默认 3000），再全屏 `AndroidView` 包 WebView 打开 `http://127.0.0.1:<port>`。PRoot 容器与宿主共享网络命名空间，容器内服务本地可直连，无需端口转发；远程 SSH 模式不适用（`TerminalViewModel.isRemoteMode()` 命中时改弹提示 toast） |
 
 ## 依赖
 

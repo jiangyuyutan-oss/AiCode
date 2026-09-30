@@ -8,8 +8,8 @@ AiCode 是一款运行在 Android 手机上的 AI 编程工具，将大语言模
 
 - **单 Activity + Compose 的 Kotlin 应用**：功能按 feature 分层（`agent` / `terminal` / `workspace` / `editor` / `git` / `settings` / `backup` / `credentials` / `onboarding`），每个 feature 内部再分 `data` / `domain` / `presentation` 三层，依赖注入统一由 Hilt 管理。
 - **本地与远程双执行后端**：本地模式基于 Termux 组件与 PRoot 运行 Alpine Linux 容器；远程模式通过 sshj 以 SSH exec channel 执行命令、shell channel 驱动终端。两者共享同一套抽象接口（`CommandEngine` / `FileAccessProvider` / `TerminalSessionProvider`），由委托层按执行模式运行时分发。
-- **AI Agent 引擎**：兼容 OpenAI / Anthropic / Gemini 三类协议，内置 19 个工具（文件读写、Shell 执行、搜索、待办、子代理派生等），支持 MCP 协议动态扩展工具、三种权限模式（BUILD / PLAN / AUTO）、检查点回滚与子代理并行。
-- **数据库与资产随代码演进**：Room 数据库（版本 52）采用「文件式 SQL 迁移 + AutoMigration」双轨机制，45+ 个迁移脚本由 `MigrationLoader` 在启动时自动执行并对账。
+- **AI Agent 引擎**：兼容 OpenAI / Anthropic / Gemini 三类协议，内置 22 个工具（文件读写、Shell 执行、代码搜索、语义检索、待办、子代理派生、God Mode 编排等），支持 MCP 协议动态扩展工具、五种权限模式（BUILD / PLAN / AUTO / TARGET / GOD）、检查点回滚与子代理并行。
+- **数据库与资产随代码演进**：Room 数据库（版本 53）采用「文件式 SQL 迁移 + AutoMigration」双轨机制，46 个迁移脚本由 `MigrationLoader` 在启动时自动执行并对账。
 
 ## 技术栈
 
@@ -72,8 +72,9 @@ project-root/
 │   │       ├── credentials/        # Git 凭据文件仓库与 helper IPC 桥
 │   │       └── onboarding/         # 首启 spotlight 引导
 │   ├── src/main/assets/
-│   │   ├── prompts/                # AI 系统提示词分片（12 个编号 .md + agent/）
-│   │   ├── migrations/             # 45+ 个 {VERSION}_{description}.sql 迁移脚本
+│   │   ├── prompts/                # AI 系统提示词分片（14 个编号 .md + agent/）
+│   │   ├── agents/                 # 内置子代理定义（explore/review/docs-writer/test-writer + God Mode 部门与评审团）
+│   │   ├── migrations/             # 46 个 {VERSION}_{description}.sql 迁移脚本
 │   │   ├── aicode/                 # 容器初始化：provision.sh、git-credential-aicode
 │   │   ├── container/              # Alpine rootfs（按 flavor 提供 arm/x86）
 │   │   └── api.official.json       # 内置 provider/模型快照
@@ -96,7 +97,7 @@ project-root/
 
 **目的**：驱动 LLM 对话循环——组装提示词 → 调用 provider → 解析工具调用 → 权限判定 → 执行工具 → 回填结果，直至产出最终回复。
 **位置**：`app/src/main/java/com/aicode/feature/agent/`
-**关键文件**：`domain/workflow/StatefulAgentWorkflow.kt`（状态机主循环）、`domain/tool/AgentTool.kt` + `ToolRegistry.kt`（工具系统）、`domain/provider/AnthropicAdapter.kt` 等（协议适配）、`domain/permission/ToolPermissionPolicyEngine.kt`（授权策略）、`domain/mcp/McpManager.kt`（MCP 扩展）、`domain/checkpoint/CheckpointManager.kt`（检查点）、`domain/tool/subagent/TaskTool.kt`（子代理派生）、`presentation/AIAgentViewModel.kt`（UI 状态中枢，约 1900 行）
+**关键文件**：`domain/workflow/StatefulAgentWorkflow.kt`（状态机主循环）、`domain/tool/AgentTool.kt` + `ToolRegistry.kt`（工具系统）、`domain/provider/AnthropicAdapter.kt` 等（协议适配）、`domain/permission/ToolPermissionPolicyEngine.kt`（授权策略）、`domain/mcp/McpManager.kt`（MCP 扩展）、`domain/checkpoint/CheckpointManager.kt`（检查点）、`domain/tool/subagent/TaskTool.kt`（子代理派生）、`domain/orchestration/OrchestratorService.kt`（God Mode 编排：批量派发部门子代理、组评审团、聚合预算）、`presentation/AIAgentViewModel.kt`（UI 状态中枢，约 2400 行）
 **依赖**：terminal（CommandEngine 执行命令）、workspace（FileAccessProvider 读写文件）、settings（AIProviderRepository 拿模型配置）、credentials
 **被依赖**：MainActivity 的聊天面板、terminal 的 AI 终端工具
 
@@ -162,7 +163,7 @@ PRoot 需要在 App 可写目录执行二进制，Android 10+ 的 W^X / SELinux 
 
 - **文件式（默认）**：`core/db/MigrationLoader.kt` 扫描 `assets/migrations/{VERSION}_{description}.sql`，由 `SqlScriptSplitter` 按语句切分（识别注释与字符串字面量），整段包事务、失败整体回滚，成功记入 `migration_history` 表。适用于含数据清理/重命名的复杂变更。
 - **AutoMigration**：纯 schema 变更（加列/建表/索引）用 `@AutoMigration` 编译期生成。
-- 两者编号共用一个连续序列（当前 SCHEMA_VERSION = 52），由 `scripts/check_migrations.py` 对账（编号连续、已发布 Tag 的迁移冻结不可篡改）。
+- 两者编号共用一个连续序列（当前 SCHEMA_VERSION = 53），由 `scripts/check_migrations.py` 对账（编号连续、已发布 Tag 的迁移冻结不可篡改）。
 
 ### flavor 按容器镜像拆包
 
@@ -184,11 +185,12 @@ flowchart LR
 
     subgraph AgentCore["feature/agent"]
         Workflow["StatefulAgentWorkflow"]
-        ToolRegistry["ToolRegistry 19 个工具"]
+        ToolRegistry["ToolRegistry 22 个工具"]
         PolicyEngine["ToolPermissionPolicyEngine"]
         Adapters["AnthropicAdapter / OpenAIAdapter / GeminiAdapter"]
         McpManager["McpManager"]
         CheckpointMgr["CheckpointManager"]
+        Orchestrator["OrchestratorService God Mode 编排"]
     end
 
     subgraph Delegation["委托层（按执行模式分发）"]
@@ -207,7 +209,7 @@ flowchart LR
     end
 
     subgraph Data["数据层"]
-        RoomDB[("AgentDatabase v52")]
+        RoomDB[("AgentDatabase v53")]
         DataStore[("DataStore 20+ 分域")]
         Files[("filesDir 工作区/快照/凭据")]
     end
@@ -221,6 +223,8 @@ flowchart LR
     MainActivity --> CodeEditor
     AIAgentVM --> Workflow
     Workflow --> ToolRegistry
+    Workflow --> Orchestrator
+    Orchestrator --> TaskTool["TaskTool 子代理派生"]
     ToolRegistry --> PolicyEngine
     PolicyEngine --> DelegatingCmd
     PolicyEngine --> DelegatingFile

@@ -18,6 +18,7 @@ core/
 │   ├── FloatingTabBar.kt / SegmentedTabs.kt / SplitHandle.kt
 │   ├── SwipeToDeleteRow.kt / AppSwitch.kt / AppTextField.kt
 │   ├── ImageViewer.kt / ImageDecode.kt
+│   ├── SharePayload.kt         # 外部分享接收的中转（进程级 StateFlow，扛 locale recreate）
 │   └── ImeInset.kt / PageMotion.kt / WindowSize.kt
 └── util/
     ├── FileLogger.kt           # 落盘日志（按天分文件、等级阈值、7 天/5MB 清理）
@@ -34,6 +35,7 @@ core/
 | `db/SqlScriptSplitter.kt` | 状态机切分 SQL：识别 `--` / `/* */` 注释、单双引号/反引号字面量（含 `''` 转义）、`[...]` 标识符——字符串里的 `;` 不误切 |
 | `net/AppProxy.kt` | `applyGlobal` 在 `attachBaseContext` 设 JVM 全局 `ProxySelector` 与 `Authenticator`（OkHttp 407 显式认证）；容器内命令经 `proxyEnv` 注入 HTTP(S)_PROXY；支持 provider 级代理按 host 分派（配合 settings 的 `ProviderProxyRegistry`） |
 | `util/FileLogger.kt` | 外部私有目录按天分文件、单线程串行、等级阈值、自动清理 |
+| `ui/SharePayload.kt` | `ACTION_SEND` 分享载荷（text 截断 2 万字符 + imageUris）与进程级 `SharePayloadHolder` 中转：MainActivity 解析 Intent 写入，AppNavigation / AIChatPanel 观察消费，只注入输入框不自动发送；用单例而非 CompositionLocal 以扛语言切换的 `recreate()` |
 
 ## 依赖
 

@@ -1,29 +1,34 @@
-# Agent 权限模式（BUILD / PLAN / AUTO）
+# Agent 权限模式（BUILD / PLAN / AUTO / TARGET / GOD）
 
 权限模式控制 AI 工具的授权范围，按信任程度在「逐步授权」与「完全放行」之间切换。它与[执行模式](./执行模式.md)正交：权限模式决定 AI 能做什么，执行模式决定在哪做。
 
 ## 什么是权限模式？
 
-每个会话有独立的 `AgentMode`（领域模型 `feature/agent/domain/model/`），UI 上随时可切。AI 也可通过 `switchMode` 工具自行切换（受授权策略约束）。
+每个会话有独立的 `AgentMode`（领域模型 `feature/agent/domain/model/ChatSession.kt`），UI 上随时可切。AI 也可通过 `switchMode` 工具自行切换（受授权策略约束）。
 
-**三种模式**:
+**五种模式**:
 
 | 模式 | 行为 |
 |------|------|
-| `BUILD` | 正常开发模式：写操作按授权规则弹窗确认 |
+| `BUILD` | 默认开发模式：写操作按授权规则弹窗确认 |
 | `PLAN` | 只读规划：`ToolPermissionPolicyEngine` 在工具层物理拦截全部写操作，AI 只能调研并输出计划；计划经 `PlanApprovalManager` 批准后切回执行 |
-| `AUTO` | 全部放行免授权，保留灾难性命令防护（如递归删除根目录类 `rm`） |
+| `AUTO` | 全部放行免授权（仅用户手动可切，AI 不能经 switchMode 进入），保留灾难性命令防护（如递归删除根目录类 `rm`） |
+| `TARGET` | 目标驱动：依 `goalStatement` 自主执行，达成（`completeGoal`）/失败/步数超限即终止；免逐步弹窗授权（等同 AUTO + 灾难防护）；AI 可经 switchMode 带目标声明申请切入 |
+| `GOD` | God Mode 甲方-乙方协作：主会话升级为 CEO，经 `orchestrate` 派发部门子代理与评审团；治理由 CEO 代为决策，授权语义复用 AUTO/TARGET（免弹窗 + 灾难防护保留）；详见 [God Mode 编排](./GodMode编排.md) |
+
+UI 模式芯片循环顺序：BUILD → PLAN → AUTO → TARGET → GOD → BUILD（`ChatInputBar`）。
 
 ## 代码位置
 
 | 方面 | 位置 |
 |------|------|
-| 模式定义 | `feature/agent/domain/model/`（`ChatSession` 携带 `AgentMode`） |
+| 模式定义 | `feature/agent/domain/model/ChatSession.kt`（`AgentMode` 五值枚举；`ChatSession` 携带） |
 | 策略引擎 | `feature/agent/domain/permission/ToolPermissionPolicyEngine.kt` |
 | 授权中台 | `feature/agent/domain/tool/ToolPermissionManager.kt` |
-| 模式切换工具 | `feature/agent/domain/tool/mode/SwitchModeTool.kt` |
+| 模式切换工具 | `feature/agent/domain/tool/mode/SwitchModeTool.kt`（参数枚举 PLAN/BUILD/TARGET/GOD；TARGET 必须带 goal，缺失报 `MISSING_GOAL`） |
+| 目标完成工具 | `feature/agent/domain/tool/mode/CompleteGoalTool.kt`（`completeGoal`） |
 | 计划批准流 | `PlanApprovalManager` |
-| 提示词 | `app/src/main/assets/prompts/80-plan-mode.md`、`81-auto-mode.md` |
+| 提示词 | `app/src/main/assets/prompts/80-plan-mode.md`、`81-auto-mode.md`、`82-target-mode.md`、`83-god-mode.md` |
 
 ## 授权判定顺序
 
@@ -53,17 +58,24 @@ flowchart TD
 ```mermaid
 stateDiagram-v2
     [*] --> BUILD: 新建会话
-    BUILD --> PLAN: 切换 / switchMode
-    PLAN --> BUILD: 计划获批准
-    BUILD --> AUTO: 切换 / switchMode
-    AUTO --> BUILD: 切换 / switchMode
-    PLAN --> AUTO: 切换 / switchMode
-    AUTO --> PLAN: 切换 / switchMode
+    BUILD --> PLAN: 用户切换 / switchMode（ASK 授权）
+    PLAN --> BUILD: 计划获批准 / switchMode
+    BUILD --> AUTO: 仅用户手动切换（AI 不可进入 AUTO）
+    AUTO --> PLAN: switchMode（AI 退出 AUTO 的唯一路径）
+    AUTO --> BUILD: 用户手动切换
+    BUILD --> TARGET: switchMode（必须带 goal）
+    TARGET --> BUILD: completeGoal 达成 / 失败或步数超限 / switchMode 切出（记 INTERRUPTED）
+    BUILD --> GOD: switchMode（ASK 授权，无 goal 要求）
+    GOD --> BUILD: switchMode（提示词约定收工后回 BUILD）
 ```
+
+> `switchMode` 工具本身 `permissionPolicy = ASK`，即 AI 每次申请切换都要用户在弹窗批准；例外是 AUTO 只能由用户在界面手动进入。UI 模式芯片循环为 BUILD → PLAN → AUTO → TARGET → GOD → BUILD。
 
 ## 关系
 
 | 关联概念 | 关系 | 描述 |
 |---------|------|------|
 | [执行模式](./执行模式.md) | 正交 | 权限模式约束「做什么」，执行模式决定「在哪做」 |
-| 检查点 | 兜底 | AUTO 模式下文件改动仍有检查点快照，可回滚 |
+| 检查点 | 兜底 | AUTO / TARGET / GOD 模式下文件改动仍有检查点快照，可回滚 |
+| [God Mode 编排](./GodMode编排.md) | 延伸 | GOD 模式在 AUTO 放行语义之上叠加 CEO 编排：派发部门子代理与评审团 |
+| [子代理](./子代理.md) | 复用 | TARGET/GOD 的自主执行与派发都跑在子代理会话机制上 |

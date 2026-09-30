@@ -121,12 +121,12 @@ Conventional Commits（`.githooks/commit-msg` 本地校验），格式 `<type>(<
 
 ### 添加数据库迁移
 
-Room 数据库当前 `SCHEMA_VERSION = 52`（见 `app/src/main/java/com/aicode/feature/agent/data/local/database/AgentDatabase.kt`）。一个版本号二选一：
+Room 数据库当前 `SCHEMA_VERSION = 53`（见 `app/src/main/java/com/aicode/feature/agent/data/local/database/AgentDatabase.kt`）。一个版本号二选一：
 
 **文件式（默认，含数据清理/重命名/改约束的版本必须走这条）**：
 
 1. 递增 `AgentDatabase.kt` 的 `SCHEMA_VERSION`
-2. 在 `app/src/main/assets/migrations/` 新建 `{VERSION}_{description}.sql`（如 `53_add_xxx.sql`），**编号必须连续**
+2. 在 `app/src/main/assets/migrations/` 新建 `{VERSION}_{description}.sql`（如 `54_add_xxx.sql`），**编号必须连续**，上游已发布 Tag 冻结的迁移文件（如 v1.10.1 冻结 8..42）逐字节不可改，新增只能用更大编号
 3. 写 DDL/SQL（字符串里可放心写 `;`，`SqlScriptSplitter` 会识别字符串字面量）
 
 **AutoMigration（纯 schema 变更：加列/建表/索引）**：

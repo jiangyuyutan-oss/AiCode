@@ -12,7 +12,7 @@
 系统设计、技术栈、组件结构、关键架构决策（本地/远程委托模式、targetSdk 28 锁定、数据库迁移双轨制、flavor 拆包）与 Mermaid 架构图。从这里开始了解系统如何运作。
 
 ### [接口](./INTERFACES.md)
-AI 工具系统（19 个内置工具 + 扩展点）、LLM Provider 适配（OpenAI / Anthropic / Gemini）、MCP 协议、执行后端抽象接口、Room 数据契约与内部脚本。集成或扩展系统的参考。
+AI 工具系统（22 个内置工具 + 扩展点）、LLM Provider 适配（OpenAI / Anthropic / Gemini）、MCP 协议、执行后端抽象接口、Room 数据契约与内部脚本。集成或扩展系统的参考。
 
 ### [开发者指南](./DEVELOPER_GUIDE.md)
 环境搭建、构建变体、分支与提交规范、资产同步硬规则（prompts / docs-site / 双语 strings）、常见任务（加迁移、加工具、加设置、发版）。贡献者必读。
@@ -23,15 +23,15 @@ AI 工具系统（19 个内置工具 + 扩展点）、LLM Provider 适配（Open
 
 | 模块 | 描述 | 文档 |
 |------|------|------|
-| `feature/agent/` | AI Agent 核心：workflow 状态机、工具系统、权限引擎、MCP、检查点、子代理 | [agent](./模块/agent.md) |
-| `feature/terminal/` | 终端会话（本地 PRoot / 远程 SSH 统一抽象）+ 进程保活 | [terminal](./模块/terminal.md) |
+| `feature/agent/` | AI Agent 核心：workflow 状态机、工具系统、权限引擎、MCP、检查点、子代理、God Mode 编排 | [agent](./模块/agent.md) |
+| `feature/terminal/` | 终端会话（本地 PRoot / 远程 SSH 统一抽象）+ 进程保活 + 容器内 Web 预览 | [terminal](./模块/terminal.md) |
 | `feature/workspace/` | 工作区管理、文件访问后端、SAF Provider、SFTP/FTP 同步 | [workspace](./模块/workspace.md) |
 | `feature/settings/` | Provider 管理、执行模式、模型连通性批量测试、20+ 分域 DataStore 设置 | [settings](./模块/settings.md) |
 | `feature/editor/` | sora-editor 封装、TextMate 语法高亮、编码检测 | [editor](./模块/editor.md) |
-| `feature/git/` | 容器内命令行 git 的可视化封装（状态/分支/历史/diff） | [git](./模块/git.md) |
+| `feature/git/` | 容器内命令行 git 的可视化封装（状态/分支/历史/diff/合并变基） | [git](./模块/git.md) |
 | `feature/backup/` | tar.gz + AES-GCM 加密备份恢复（流式） | [backup](./模块/backup.md) |
 | `feature/credentials/` | Git 凭据文件仓库与 helper 文件 IPC 桥 | [credentials](./模块/credentials.md) |
-| `core/` | 数据库迁移加载、全局代理、主题、通用组件、玻璃材质系统、日志 | [core](./模块/core.md) |
+| `core/` | 数据库迁移加载、全局代理、主题、通用组件、日志 | [core](./模块/core.md) |
 | `:terminal-emulator` / `:terminal-view` | Termux 派生终端模块（Java，Apache 2.0） | 见 [架构-项目结构](./ARCHITECTURE.md#项目结构) |
 
 `feature/onboarding/`（首启 spotlight 引导）体量小、自包含：`domain/OnboardingStep.kt` 定义 10 步流程，`OnboardingCoordinator` 桥接状态机与 DataStore 持久化，UI 侧 `OnboardingOverlay` + `SpotlightOverlay` 实现挖孔高亮。
@@ -45,10 +45,11 @@ AI 工具系统（19 个内置工具 + 扩展点）、LLM Provider 适配（Open
 | 概念 | 描述 |
 |------|------|
 | [执行模式](./专有概念/执行模式.md) | 本地 PRoot 容器 vs 远程 SSH，三个委托层的分发依据 |
-| [Agent 权限模式](./专有概念/Agent权限模式.md) | BUILD / PLAN / AUTO 三档授权范围与判定顺序 |
+| [Agent 权限模式](./专有概念/Agent权限模式.md) | BUILD / PLAN / AUTO / TARGET / GOD 五档授权范围与判定顺序 |
 | [PRoot 容器](./专有概念/PRoot容器.md) | 免 root 的 Alpine 用户态容器机制与构建打包约束 |
 | [检查点](./专有概念/检查点.md) | AI 改码前的自动快照与三维回滚 |
 | [子代理](./专有概念/子代理.md) | 独立上下文的后台并行代理，定义可全局/项目级定制 |
+| [God Mode 编排](./专有概念/GodMode编排.md) | 甲方-乙方协作：主会话当 CEO，经 orchestrate 派发部门与评审团 |
 
 ---
 

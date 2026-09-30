@@ -9,6 +9,7 @@ feature/backup/
 ├── domain/
 │   ├── BackupManager.kt        # 接口：export / import / previewImport / exportSession
 │   ├── BackupCrypto.kt         # PBKDF2 + AES-GCM
+│   ├── SessionMarkdownExporter.kt  # 会话导出为可读 Markdown（非备份包，走 SAF）
 │   └── BackupSnapshot.kt       # 快照 DTO（schemaVersion 兼容性校验）
 ├── data/
 │   └── BackupManagerImpl.kt    # 实现：跨 Room + DataStore 采集/还原
@@ -25,6 +26,7 @@ feature/backup/
 | `domain/BackupCrypto.kt` | PBKDF2WithHmacSHA256（21 万迭代）派生密钥 + AES/GCM；salt+IV 写文件头；手动 64KB 分块 `Cipher.update/doFinal`（刻意避开 `CipherInputStream` 吞 GCM 校验异常的坑）；口令错误抛 `BackupDecryptionException` |
 | `data/BackupManagerImpl.kt` | Apache commons-compress 流式 tar.gz；跨 Room 各 DAO + 各 DataStore 设置仓库采集/还原 |
 | `domain/BackupSnapshot.kt` | 与 Room Entity 同构但解耦的 `@Serializable` DTO，`schemaVersion` 做兼容性校验 |
+| `domain/SessionMarkdownExporter.kt` | 会话导出 Markdown：纯函数生成 `# 标题` + 逐条 `## 用户` / `## AI` / 工具 blockquote（工具参数展平截断 300 字符），剔除压缩锚点/摘要/后台通知与 reasoning；由聊天侧栏长按菜单经 SAF `CreateDocument("text/markdown")` 落盘 |
 
 ## 依赖
 

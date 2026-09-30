@@ -44,10 +44,13 @@ interface AgentTool {
 | `loadSkill` | LoadSkillTool | skill/LoadSkillTool.kt | 加载技能（Skills） |
 | `memory` | MemoryTool | memory/MemoryTool.kt | 读写长期记忆 |
 | `todo` | TodoTool | todo/TodoTool.kt | 任务清单管理 |
-| `switchMode` | SwitchModeTool | mode/SwitchModeTool.kt | BUILD/PLAN/AUTO 模式切换 |
+| `switchMode` | SwitchModeTool | mode/SwitchModeTool.kt | BUILD/PLAN/AUTO/TARGET/GOD 模式切换 |
+| `completeGoal` | CompleteGoalTool | mode/CompleteGoalTool.kt | TARGET 模式声明目标已达成并终止 |
 | `askUserQuestion` | AskUserQuestionTool | question/AskUserQuestionTool.kt | 向用户提问（挂起等待） |
 | `manageMcp` | ManageMcpTool | mcp/ManageMcpTool.kt | 管理 MCP 服务器连接 |
 | `task` | TaskTool | subagent/TaskTool.kt | 派生子代理并行工作 |
+| `semantic_search` | SemanticSearchTool | semantic/SemanticSearchTool.kt | 本地 TF-IDF 语义检索工作区文件（免网络、内存倒排索引） |
+| `orchestrate` | OrchestrateTool | orchestration/OrchestrateTool.kt | God Mode 编排：派发部门子代理、组评审团、查状态与预算（仅 GOD 模式） |
 
 ## LLM Provider 适配
 
@@ -99,11 +102,11 @@ interface AIProvider {
 
 ## 数据契约（Room 实体）
 
-主数据库 `aicode_agent_db`，`AgentDatabase`（`feature/agent/data/local/database/AgentDatabase.kt`），`SCHEMA_VERSION = 52`：
+主数据库 `aicode_agent_db`，`AgentDatabase`（`feature/agent/data/local/database/AgentDatabase.kt`），`SCHEMA_VERSION = 53`：
 
 | 实体（表名） | 路径 `feature/agent/data/local/entity/` | 关键字段 |
 |-------------|------|--------|
-| `ChatSessionEntity`（chat_sessions） | ChatSessionEntity.kt | 标题、模式（BUILD/PLAN/AUTO）、provider/model、token 统计、parentId（子代理会话） |
+| `ChatSessionEntity`（chat_sessions） | ChatSessionEntity.kt | 标题、模式（BUILD/PLAN/AUTO/TARGET/GOD）、provider/model、token 统计、parentId + subagentType（子代理会话）、目标模式字段（goalStatement/goalTerminationReason/goalStepCount/goalFailCount，migration 53） |
 | `AgentMessageEntity`（agent_messages） | AgentMessageEntity.kt | 角色、内容、工具调用 JSON、附件、reasoning 回传字段 |
 | `TodoItemEntity`（todo_items） | TodoItemEntity.kt | AI 任务清单项 |
 | `CheckpointEntity`（session_checkpoints） | CheckpointEntity.kt | 检查点节点（归属会话与用户消息） |
@@ -147,4 +150,18 @@ interface AIProvider {
 
 - `ToolPermissionPolicyEngine`（`feature/agent/domain/permission/`）：弹窗前判定 ALLOW / DENY / ASK。判定顺序：DENY 规则 → 不可静态判定则 ASK → 内置安全白名单（`BuiltInSafeCommands`）→ 已记忆 ALLOW 规则 → ASK
 - `ToolPermissionManager`（`feature/agent/domain/tool/`）：授权中台，`awaitApproval()` 挂起（CompletableDeferred）等用户在弹窗选择，多会话并行互不阻塞
-- 三种运行模式：BUILD（正常授权）、PLAN（工具层拦截全部写操作）、AUTO（全部放行，保留灾难性 `rm` 防护）
+- 五种运行模式：BUILD（正常授权）、PLAN（工具层拦截全部写操作）、AUTO（全部放行，保留灾难性 `rm` 防护）、TARGET（目标驱动自主执行，授权语义等同 AUTO）、GOD（God Mode 编排，授权语义等同 AUTO；详见下文编排接口与[专有概念](./专有概念/GodMode编排.md)）
+
+## God Mode 编排接口
+
+`OrchestratorService`（`feature/agent/domain/orchestration/OrchestratorService.kt`，@Singleton）是 `orchestrate` 工具的域层后端：
+
+| 方法 | 签名概要 | 职责 |
+|------|---------|------|
+| `parseDeploySpecs` | `(raw: JsonArray?) → List<DeploySpec>` | 纯函数解析任务数组；缺 prompt 条目丢弃，name 截断 60 字符 |
+| `deploy` | `(context, specs) → Pair<List<Deployed>, List<String>>` | 一批最多 `MAX_BATCH_DEPARTMENTS = 5` 个（对齐 `SubAgentEventBus.MAX_RUNNING`）；创建 `subagentType = "dept"` 子会话并发 SPAWNED 事件；未知 agent 名跳过并附可用清单 |
+| `spawnJury` | `(context, diffSpec, includeForeman) → ...` | 固定派 3 名只读评审（review-tough / review-pragmatic / review-optimist），`includeForeman=true` 追加评审长（forehead） |
+| `budget` | `(context) → JsonObject` | 聚合父+子会话 token：totalInput/totalOutput/totalTokens/subCount/running/depts[] |
+| `listSubSessions` | `(parentId) → List<SubSessionInfo>` | 子会话列表，按事件总线活跃集标 RUNNING/COMPLETED |
+
+`orchestrate` 工具门控与错误码：`context.mode != GOD` → `NOT_GOD_MODE`；phase 枚举 `decompose` / `review` / `status` / `budget`，未知 → `INVALID_PHASE`；decompose 缺任务 → `MISSING_TASKS`；review 缺 diffSpec → `MISSING_DIFF`。子代理间不直连，完成经 `SubAgentEventBus` 通知父会话，CEO 用 `task(action="read")` 拉结论。

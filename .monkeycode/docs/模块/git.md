@@ -1,6 +1,6 @@
 # git — Git 可视化模块
 
-基于容器内命令行 `git`（非 JGit）的可视化 Git 面板：状态、分支、提交历史（含泳道拓扑图）、差异、标签、暂存/回退与凭据配置。
+基于容器内命令行 `git`（非 JGit）的可视化 Git 面板：状态、分支、提交历史（含泳道拓扑图）、差异、标签、暂存/回退、分支合并/变基与冲突横幅、凭据配置。
 
 ## 结构
 
@@ -23,9 +23,11 @@ feature/git/
 
 | 文件 | 目的 |
 |------|------|
-| `domain/GitRepository.kt` | 经 `CommandEngine.runCommandSyncUnbounded` 执行 git（cwd=当前工作区），逐参数 shell 转义拼 `/bin/sh -c`；统一带 `-c core.quotepath=false` 防中文路径乱码。读命令 `git()`，写命令 `gitChecked()`（非零退出抛 `GitCommandFailureException` 携带 git 输出） |
+| `domain/GitRepository.kt` | 经 `CommandEngine.runCommandSyncUnbounded` 执行 git（cwd=当前工作区），逐参数 shell 转义拼 `/bin/sh -c`；统一带 `-c core.quotepath=false` 防中文路径乱码。读命令 `git()`，写命令 `gitChecked()`（非零退出抛 `GitCommandFailureException` 携带 git 输出）。合并/变基：`merge` / `rebase` / `abortMerge` / `abortRebase` / `continueRebase` 一律带 `-c core.editor=true` 防交互式提交编辑器挂起；`isMerging` / `isRebasing` 用 `rev-parse --verify MERGE_HEAD` / `REBASE_HEAD` 探测；冲突文件由纯函数 `mergeConflictsFromPorcelain` 解析 `status --porcelain=v1`（两列同属 `UAD` 即未合并） |
 | `domain/GitGraphBuilder.kt` | 解析 `git log`（0x1f 分隔字段）做泳道布局，输出 `GitGraph` 领域模型 |
 | `domain/GitErrorMessage.kt` | stderr 模式匹配转译（冲突/无凭据/网络错误等） |
+| `presentation/component/GitBranchesTab.kt` | 分支右键菜单的 Merge 动作（非当前分支）弹一个「合并 / 变基 / 取消」确认框 |
+| `presentation/component/GitScreen.kt` | 合并/变基进行中且非加载态时，tabs 上方渲染 `MergeConflictBanner`：冲突文件数 + 前 3 条路径（列表为空回退终端提示），恒有「中止」，变基时另有「继续变基」 |
 
 ## 依赖
 
