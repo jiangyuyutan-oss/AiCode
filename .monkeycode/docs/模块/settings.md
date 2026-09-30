@@ -55,7 +55,7 @@ feature/settings/
 
 **执行模式切换**：改模式必须经 `ExecutionModeRepository` → `ExecutionModeHolder`，保证三个委托层即时感知；不要在各处缓存模式快照。
 
-**模型连通性测试**：单测 `ModelApiService.testModel` 发极短 "hi" 请求验证 Key+模型+端点；批量 `testAllModels(provider)` 限并发 4（`Semaphore.withPermit`）测当前 provider 模型列表全部模型，逐条复用 `_testing`/`_testResults`（每行实时反映），`BatchTestState` 聚合 total/done/success，`stopAllModels` 取消（OkHttp 阻塞调用不响应 cancel，`finally` 清残留 testing 标记兜底）。
+**模型连通性测试**：单测 `ModelApiService.testModel` 发极短 "hi" 请求验证 Key+模型+端点；批量 `testAllModels(provider)` 限并发 4（`Semaphore.withPermit`）测当前 provider 模型列表全部模型，逐条复用 `_testing`/`_testResults`（每行实时反映），`BatchTestState` 聚合 total/done/success（完成后仍保留摘要，编辑页按 `total > 0` 展示）。`stopAllModels` / `resetModelTests` 递增 `modelTestEpoch` 后取消 job，丢弃迟到的 OkHttp 结果，避免退出编辑页后残留 running / 结果回写。进入、退出 `ProviderEditorScreen` 都调 `resetModelTests` 刷新到空白状态。
 
 **玻璃材质配置**：`BackgroundSettingsRepository` 在既有 `background_prefs` 加 6 个玻璃键 + `glassStateFlow` 聚合（复用 `frost_intensity` × 32 换算半径，零 Room 迁移）；UI 侧 `glassPanel` Modifier 从 `LocalGlassSettings`/`LocalBackdrop` 读配置与壁纸源（见 [core 模块](./core.md)），三区域（侧边栏/输入框/内容面板）接线在 MainActivity 与 AIChatPanel/ChatInputBar。
 

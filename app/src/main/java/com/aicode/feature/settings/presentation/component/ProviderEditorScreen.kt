@@ -266,11 +266,11 @@ fun ProviderEditorScreen(
 
     DisposableEffect(Unit) {
         viewModel.resetFetchState()
-        viewModel.clearTestResults()
+        viewModel.resetModelTests()
         viewModel.clearBalanceTestState()
         onDispose {
             viewModel.resetFetchState()
-            viewModel.clearTestResults()
+            viewModel.resetModelTests()
             viewModel.clearBalanceTestState()
         }
     }
@@ -747,7 +747,7 @@ fun ProviderEditorScreen(
                             }
                         }
                     }
-                    if (batchTestState.running) {
+                    if (batchTestState.total > 0) {
                         Text(
                             text = stringResource(
                                 R.string.provider_test_batch_summary,

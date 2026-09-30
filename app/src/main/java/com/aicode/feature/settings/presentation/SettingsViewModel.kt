@@ -533,6 +533,7 @@ class SettingsViewModel @Inject constructor(
     val batchTestState: StateFlow<BatchTestState> = _batchTestState.asStateFlow()
 
     private var batchTestJob: Job? = null
+    private var modelTestEpoch: Int = 0
 
     private val _balanceTestState = MutableStateFlow<ProviderBalanceState>(ProviderBalanceState.Idle)
     val balanceTestState: StateFlow<ProviderBalanceState> = _balanceTestState.asStateFlow()
@@ -1859,17 +1860,29 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun testModel(provider: AIProviderConfig, model: String) {
+        val epoch = modelTestEpoch
         viewModelScope.launch {
+            if (epoch != modelTestEpoch) return@launch
             _testing.update { it + model }
             val result = modelApiService.testModel(provider.baseUrl, provider.firstUsableApiKey, provider.type, provider.useFullUrl, provider.useResponseApi, model, provider.customHeaders)
+            if (epoch != modelTestEpoch) return@launch
             _testResults.update { it + (model to result) }
             _testing.update { it - model }
         }
     }
 
     fun clearTestResults() {
+        resetModelTests()
+    }
+
+    /** 停掉进行中的连通性测试并清空结果 / 批量进度，供编辑页进入、退出时刷新状态。 */
+    fun resetModelTests() {
+        modelTestEpoch++
+        batchTestJob?.cancel()
+        batchTestJob = null
         _testResults.value = emptyMap()
         _testing.value = emptySet()
+        _batchTestState.value = BatchTestState()
     }
 
     /**
@@ -1880,7 +1893,10 @@ class SettingsViewModel @Inject constructor(
         if (batchTestJob?.isActive == true) return
         val models = provider.models
         if (models.isEmpty()) return
+        val epoch = ++modelTestEpoch
         batchTestJob = viewModelScope.launch {
+            _testResults.value = emptyMap()
+            _testing.value = emptySet()
             _batchTestState.value = BatchTestState(provider.id, models.size, 0, 0, true)
             val semaphore = Semaphore(4)
             try {
@@ -1888,6 +1904,7 @@ class SettingsViewModel @Inject constructor(
                     models.map { model ->
                         async {
                             semaphore.withPermit {
+                                if (epoch != modelTestEpoch) return@withPermit
                                 _testing.update { it + model }
                                 val result = modelApiService.testModel(
                                     provider.baseUrl,
@@ -1898,6 +1915,7 @@ class SettingsViewModel @Inject constructor(
                                     model,
                                     provider.customHeaders,
                                 )
+                                if (epoch != modelTestEpoch) return@withPermit
                                 _testResults.update { it + (model to result) }
                                 _testing.update { it - model }
                                 _batchTestState.update {
@@ -1911,14 +1929,16 @@ class SettingsViewModel @Inject constructor(
                     }.awaitAll()
                 }
             } finally {
-                _batchTestState.update { it.copy(running = false) }
-                // 取消时正在跑的 OkHttp 阻塞调用不响应 cancel，清空残留 testing 标记兜底
-                _testing.value = emptySet()
+                if (epoch == modelTestEpoch) {
+                    _batchTestState.update { it.copy(running = false) }
+                    _testing.value = emptySet()
+                }
             }
         }
     }
 
     fun stopAllModels() {
+        modelTestEpoch++
         batchTestJob?.cancel()
         batchTestJob = null
         _testing.value = emptySet()

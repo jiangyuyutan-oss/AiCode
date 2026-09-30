@@ -89,7 +89,7 @@ Your values take priority; unfilled ones fall back to auto-detected results. If 
 
 **Thinking effort**: the lightning icon button above the input box is always available. If the current model's supported levels can be detected, only those are listed; otherwise (model has no level info, or the relay renamed it) all levels are shown — `Off` / `Lowest` / `Low` / `Medium` / `High` / `Highest` / `Max` — and you decide. Some relay models force reasoning on but use non-standard names, and this still lets you adjust manually. The choice is remembered and carried over when a new session uses this model.
 
-**Test**: every model row has a "Test" button that sends one real request to verify connectivity, with the result shown below the row.
+**Test**: every model row has a "Test" button that sends one real request to verify connectivity, with the result shown below the row. "Test all" at the top of the list probes every model on this provider concurrently; progress (done / total / succeeded) stays above the list, and each row updates as it finishes. Tap "Stop" to cancel. Leaving the editor page aborts the run and clears results, so the next visit starts blank.
 
 **Reorder**: long-press and drag the model name area to reorder. Changes take effect immediately (the model picker and default model list both follow this order) and survive restart.
 
