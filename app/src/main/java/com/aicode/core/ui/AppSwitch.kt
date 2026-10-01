@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.aicode.core.theme.semanticColors
 
 /**
  * 全局统一的精致紧凑型开关组件：
@@ -44,14 +45,13 @@ fun AppSwitch(
 ) {
     val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
 
-    // 轨道颜色
-    val targetTrackColor = when {
+    // 轨道颜色：开=品牌（鸿蒙）蓝，关=中性冷灰（浅色轨道 / 深色抬起槽），对齐整体灰阶
+    val trackColor = when {
         checked -> MaterialTheme.colorScheme.primary
-        isLight -> Color(0xFFE2E8F0)
-        else -> Color(0xFF334155)
+        else -> MaterialTheme.semanticColors.capsuleSurface
     }
     val animatedTrackColor by animateColorAsState(
-        targetValue = targetTrackColor,
+        targetValue = trackColor,
         animationSpec = tween(durationMillis = 200),
         label = "switchTrackColor"
     )

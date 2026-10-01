@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicode.R
+import com.aicode.core.theme.Radius
 import com.aicode.core.theme.Spacing
 import com.aicode.core.theme.semanticColors
 import compose.icons.FeatherIcons
@@ -110,7 +111,7 @@ internal fun SettingsGroupHeader(text: String) {
     )
 }
 
-/** 白色/深色分组圆角卡片容器：内部按行排布，行间用 [SettingsDivider] 分隔。 */
+/** 白色/深色分组圆角卡片容器：内部按行排布，行间用 [SettingsDivider] 分隔。卡片圆角对齐鸿蒙大圆角规范。 */
 @Composable
 internal fun SettingsGroup(
     modifier: Modifier = Modifier,
@@ -118,7 +119,7 @@ internal fun SettingsGroup(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(Radius.xl),
         color = MaterialTheme.semanticColors.cardSurface,
         shadowElevation = 0.dp
     ) {
