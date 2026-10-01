@@ -9,6 +9,6 @@
         <item name="android:windowBackground">@drawable/splash_background</item>
     </style>
 
-    <color name="primary">#007ACC</color>
-    <color name="splash_background_color">#F9FAFA</color>
+    <color name="primary">#0A59F7</color>
+    <color name="splash_background_color">#F1F3F5</color>
 </resources>

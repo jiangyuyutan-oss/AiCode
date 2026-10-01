@@ -8,5 +8,5 @@
         <item name="android:windowBackground">@drawable/splash_background</item>
     </style>
 
-    <color name="splash_background_color">#121212</color>
+    <color name="splash_background_color">#0B0C0E</color>
 </resources>

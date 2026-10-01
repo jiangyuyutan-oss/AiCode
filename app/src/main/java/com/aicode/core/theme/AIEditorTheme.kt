@@ -1,6 +1,7 @@
 package com.aicode.core.theme
 
 import android.os.Build
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -16,6 +17,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,18 +32,41 @@ object Spacing {
 }
 
 object Radius {
-    val xs = 4.dp
-    val sm = 8.dp
-    val md = 10.dp
-    val lg = 14.dp
+    val xs = 6.dp
+    val sm = 10.dp
+    val md = 14.dp
+    val lg = 18.dp
+    val xl = 22.dp
+    val xxl = 28.dp
     val pill = 999.dp
 }
 
+/**
+ * 品牌色对齐 HarmonyOS 设计规范：强调蓝 `#0A59F7` 为主色，Sky 为深一档，
+ * 通知橙对齐系统提醒色，图标灰采用鸿蒙中性冷灰。
+ * 参考 HarmonyOS 应用界面设计「色彩」章节的系统色板。
+ */
 object Brand {
-    val Blue = Color(0xFF2563EB)
-    val Sky = Color(0xFF38BDF8)
-    val IconGray = Color(0xFF64748B)
-    val Orange = Color(0xFFF57C00)
+    val Blue = Color(0xFF0A59F7)
+    val Sky = Color(0xFF317AF7)
+    val IconGray = Color(0xFF8A8E99)
+    val Orange = Color(0xFFFF9600)
+}
+
+/**
+ * 统一动效曲线与时长，对齐 HarmonyOS「动效」：位移走减速贝塞尔（前快后缓落位），
+ * 强调交互用弹性收尾。集中定义避免各组件 tween 参数各写一套、节奏不齐。
+ */
+object Motion {
+    // 鸿蒙位移曲线：起步快、落位缓，等价 CubicBezier(0.25, 0.1, 0.25, 1) 的减速族。
+    val Decelerate = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1f)
+    // 强调/收尾曲线：略带回弹感。
+    val Emphasized = CubicBezierEasing(0.4f, 0.48f, 0.3f, 1.0f)
+
+    const val QUICK_MS = 140
+    const val STANDARD_MS = 240
+    const val SMOOTH_MS = 320
+    const val PAGE_MS = 300
 }
 
 /** 全局统一语义色彩，解决业务代码私自 hardcode 颜色问题。 */
@@ -88,13 +113,13 @@ val LightSemanticColors = AppSemanticColors(
     diffAddBg = Color(0x2622C55E),
     diffRemove = Color(0xFFEF4444),
     diffRemoveBg = Color(0x26EF4444),
-    subtleText = Color(0xFF8E8E93),
-    subtleBorder = Color(0xFFE5E5EA),
+    subtleText = Color(0xFF8A8E99),
+    subtleBorder = Color(0xFFDDE0E5),
     cardSurface = Color(0xFFFFFFFF),
-    pageBackground = Color(0xFFF8F8F8),
-    mutedSurface = Color(0xFFF2F2F7),
-    capsuleSurface = Color(0xFFE9E9EB),
-    buttonMutedBg = Color(0xFFF0F2F5)
+    pageBackground = Color(0xFFF1F3F5),
+    mutedSurface = Color(0xFFEBEEF2),
+    capsuleSurface = Color(0xFFE4E7EC),
+    buttonMutedBg = Color(0xFFF2F3F5)
 )
 
 val DarkSemanticColors = AppSemanticColors(
@@ -114,13 +139,13 @@ val DarkSemanticColors = AppSemanticColors(
     diffAddBg = Color(0x334ADE80),
     diffRemove = Color(0xFFF87171),
     diffRemoveBg = Color(0x33F87171),
-    subtleText = Color(0xFF94A3B8),
-    subtleBorder = Color(0xFF2A3F56),
-    cardSurface = Color(0xFF0D1B2E),
-    pageBackground = Color(0xFF07111F),
-    mutedSurface = Color(0xFF13273F),
-    capsuleSurface = Color(0xFF1E293B),
-    buttonMutedBg = Color(0xFF1E293B)
+    subtleText = Color(0xFF8A8E99),
+    subtleBorder = Color(0xFF33373D),
+    cardSurface = Color(0xFF16181B),
+    pageBackground = Color(0xFF0B0C0E),
+    mutedSurface = Color(0xFF222529),
+    capsuleSurface = Color(0xFF2B2F34),
+    buttonMutedBg = Color(0xFF2B2F34)
 )
 
 val LocalAppSemanticColors = staticCompositionLocalOf { LightSemanticColors }
@@ -133,7 +158,7 @@ val MaterialTheme.semanticColors: AppSemanticColors
 /** Git 模块统一 8 色泳道调色板 */
 object GitLanePalette {
     val colors = listOf(
-        Color(0xFF2563EB), // 1. 经典蓝
+        Color(0xFF0A59F7), // 1. 鸿蒙蓝
         Color(0xFF16A34A), // 2. 翠绿
         Color(0xFFF59E0B), // 3. 琥珀
         Color(0xFF8B5CF6), // 4. 优雅紫
@@ -149,7 +174,7 @@ object GitStatusColors {
     val Added = Color(0xFF16A34A)
     val Modified = Color(0xFFD97706)
     val Deleted = Color(0xFFDC2626)
-    val Renamed = Color(0xFF2563EB)
+    val Renamed = Color(0xFF0A59F7)
     val Untracked = Color(0xFF94A3B8)
     val Conflict = Color(0xFF9333EA)
     val TypeChanged = Color(0xFF0891B2)
@@ -191,33 +216,33 @@ object StorageUsagePalette {
 }
 
 internal val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF60A5FA),
-    onPrimary = Color(0xFF082F49),
-    primaryContainer = Color(0xFF0F3A63),
-    onPrimaryContainer = Color(0xFFDBEAFE),
-    secondary = Color(0xFF7DD3FC),
-    onSecondary = Color(0xFF082F49),
-    secondaryContainer = Color(0xFF0C4A6E),
-    onSecondaryContainer = Color(0xFFBAE6FD),
+    primary = Color(0xFF317AF7),
+    onPrimary = Color(0xFF061A40),
+    primaryContainer = Color(0xFF13294B),
+    onPrimaryContainer = Color(0xFFD6E4FF),
+    secondary = Color(0xFF4E8CFF),
+    onSecondary = Color(0xFF061A40),
+    secondaryContainer = Color(0xFF16305C),
+    onSecondaryContainer = Color(0xFFD6E4FF),
     tertiary = Color(0xFF22C55E),
     tertiaryContainer = Color(0xFF14532D),
     onTertiaryContainer = Color(0xFFBBF7D0),
-    background = Color(0xFF07111F),
-    onBackground = Color(0xFFEAF2FF),
-    surface = Color(0xFF0D1B2E),
-    onSurface = Color(0xFFEAF2FF),
-    surfaceVariant = Color(0xFF13273F),
-    onSurfaceVariant = Color(0xFFB8C7DA),
+    background = Color(0xFF0B0C0E),
+    onBackground = Color(0xFFF0F1F3),
+    surface = Color(0xFF16181B),
+    onSurface = Color(0xFFF0F1F3),
+    surfaceVariant = Color(0xFF222529),
+    onSurfaceVariant = Color(0xFFB8BCC4),
     surfaceTint = Color.Transparent,
-    surfaceContainerLowest = Color(0xFF050C17),
-    surfaceContainerLow = Color(0xFF07111F),
-    surfaceContainer = Color(0xFF0D1B2E),
-    surfaceContainerHigh = Color(0xFF13273F),
-    surfaceContainerHighest = Color(0xFF1B3350),
-    surfaceBright = Color(0xFF24405F),
-    surfaceDim = Color(0xFF07111F),
-    outline = Color(0xFF64748B),
-    outlineVariant = Color(0xFF334155),
+    surfaceContainerLowest = Color(0xFF070809),
+    surfaceContainerLow = Color(0xFF0B0C0E),
+    surfaceContainer = Color(0xFF16181B),
+    surfaceContainerHigh = Color(0xFF222529),
+    surfaceContainerHighest = Color(0xFF2B2F34),
+    surfaceBright = Color(0xFF3A3E44),
+    surfaceDim = Color(0xFF0B0C0E),
+    outline = Color(0xFF6B7078),
+    outlineVariant = Color(0xFF33373D),
     error = Color(0xFFF87171),
     onError = Color(0xFF450A0A),
     errorContainer = Color(0xFF7F1D1D),
@@ -227,31 +252,31 @@ internal val DarkColorScheme = darkColorScheme(
 internal val LightColorScheme = lightColorScheme(
     primary = Brand.Blue,
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFDBEAFE),
-    onPrimaryContainer = Color(0xFF0B3B76),
-    secondary = Color(0xFF0284C7),
+    primaryContainer = Color(0xFFE9F1FF),
+    onPrimaryContainer = Color(0xFF0A3A9B),
+    secondary = Brand.Sky,
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFE0F2FE),
-    onSecondaryContainer = Color(0xFF075985),
+    secondaryContainer = Color(0xFFE9F1FF),
+    onSecondaryContainer = Color(0xFF0A59F7),
     tertiary = Color(0xFF16A34A),
     tertiaryContainer = Color(0xFFDCFCE7),
     onTertiaryContainer = Color(0xFF15803D),
-    background = Color(0xFFFFFFFF),
-    onBackground = Color(0xFF0F172A),
+    background = Color(0xFFF1F3F5),
+    onBackground = Color(0xFF1A1A1A),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF0F172A),
-    surfaceVariant = Color(0xFFEAF4FF),
-    onSurfaceVariant = Color(0xFF475569),
+    onSurface = Color(0xFF1A1A1A),
+    surfaceVariant = Color(0xFFEBEEF2),
+    onSurfaceVariant = Color(0xFF5A5E66),
     surfaceTint = Color.White,
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFFAFCFF),
-    surfaceContainer = Color(0xFFF4F9FF),
-    surfaceContainerHigh = Color(0xFFEAF4FF),
-    surfaceContainerHighest = Color(0xFFE0EDFA),
+    surfaceContainerLow = Color(0xFFF7F8FA),
+    surfaceContainer = Color(0xFFF1F3F5),
+    surfaceContainerHigh = Color(0xFFEAEDF1),
+    surfaceContainerHighest = Color(0xFFE4E7EC),
     surfaceBright = Color(0xFFFFFFFF),
-    surfaceDim = Color(0xFFE8EEF6),
-    outline = Color(0xFFD1D1D6),
-    outlineVariant = Color(0xFFE5E5EA),
+    surfaceDim = Color(0xFFE8EAED),
+    outline = Color(0xFFC9CDD4),
+    outlineVariant = Color(0xFFDDE0E5),
     error = Color(0xFFDC2626),
 
     onError = Color(0xFFFFFFFF),
@@ -259,14 +284,38 @@ internal val LightColorScheme = lightColorScheme(
     onErrorContainer = Color(0xFF7F1D1D)
 )
 
+/**
+ * 应用字体族接线点。
+ *
+ * 鸿蒙设计规范使用 HarmonyOS Sans。字体 `.ttf` 为受版权保护的二进制资产且需从华为官网
+ * 授权页下载，仓库不内置；这里用 `FontFamily.SansSerif` 接线——在华为 / EMUI / HarmonyOS
+ * 设备上系统无衬线字体即 HarmonyOS Sans（自动落到鸿蒙字面），其它设备回退 Roboto。
+ * 后续若拿到授权字体文件放入 `res/font/`，把本 val 换成
+ * `FontFamily(ResourceFont(R.font.harmonyos_sans, ...))` 即可全站生效。
+ */
+val AppFontFamily: FontFamily = FontFamily.SansSerif
+
 private val AppTypography = Typography().run {
+    fun TextStyle.harmony(weight: FontWeight? = null, lh: Int? = null, ls: Int = 0) = copy(
+        fontFamily = AppFontFamily,
+        letterSpacing = ls.sp,
+    ).let { if (weight != null) it.copy(fontWeight = weight) else it }
+        .let { if (lh != null) it.copy(lineHeight = lh.sp) else it }
+
     copy(
-        headlineSmall = headlineSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp),
-        titleLarge = titleLarge.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.sp),
-        titleMedium = titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        bodyLarge = bodyLarge.copy(lineHeight = 24.sp),
-        bodyMedium = bodyMedium.copy(lineHeight = 21.sp),
-        labelLarge = labelLarge.copy(fontWeight = FontWeight.Medium, letterSpacing = 0.sp)
+        headlineLarge = headlineLarge.harmony(FontWeight.Bold),
+        headlineMedium = headlineMedium.harmony(FontWeight.Bold),
+        headlineSmall = headlineSmall.harmony(FontWeight.SemiBold, lh = 32),
+        titleLarge = titleLarge.harmony(FontWeight.SemiBold, lh = 28),
+        titleMedium = titleMedium.harmony(FontWeight.Medium, lh = 24),
+        titleSmall = titleSmall.harmony(FontWeight.Medium, lh = 20),
+        bodyLarge = bodyLarge.harmony(lh = 26),
+        bodyMedium = bodyMedium.harmony(lh = 22),
+        bodySmall = bodySmall.harmony(lh = 18),
+        labelLarge = labelLarge.harmony(FontWeight.Medium),
+        // 鸿蒙辅助文字带轻微正字距，避免窄屏小字粘连。
+        labelMedium = labelMedium.harmony(ls = 2),
+        labelSmall = labelSmall.harmony(ls = 2)
     )
 }
 
