@@ -360,6 +360,10 @@
     <string name="about_version">版本</string>
     <string name="about_github_repo">GitHub 仓库</string>
     <string name="about_license">开源许可证</string>
+    <!-- HarmonyOS Sans 字体许可 prominent notice -->
+    <string name="about_font_license">HarmonyOS Sans 字体</string>
+    <string name="about_font_license_desc">Copyright 2021 Huawei Device Co., Ltd. 本应用使用 HarmonyOS Sans Fonts，遵循 HarmonyOS Sans Fonts License Agreement 分发未修改字体副本。</string>
+    <string name="about_font_license_view">查看完整许可</string>
     <string name="about_description">在 Android 设备上运行的 AI 驱动代码编辑器 · 内置终端 · AI Agent · MCP 协议</string>
     <string name="about_check_update">检查更新</string>
     <string name="about_checking_update">正在向 GitHub 查询最新版本…</string>

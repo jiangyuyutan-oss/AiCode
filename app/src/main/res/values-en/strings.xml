@@ -360,6 +360,10 @@
     <string name="about_version">Version</string>
     <string name="about_github_repo">GitHub Repository</string>
     <string name="about_license">Open Source License</string>
+    <!-- HarmonyOS Sans font prominent notice -->
+    <string name="about_font_license">HarmonyOS Sans Font</string>
+    <string name="about_font_license_desc">Copyright 2021 Huawei Device Co., Ltd. This app uses HarmonyOS Sans Fonts, redistributed as unmodified copies under the HarmonyOS Sans Fonts License Agreement.</string>
+    <string name="about_font_license_view">View full license</string>
     <string name="about_description">AI-powered code editor running on Android · Built-in Terminal · AI Agent · MCP Protocol</string>
     <string name="about_check_update">Check for updates</string>
     <string name="about_checking_update">Querying GitHub for the latest version…</string>

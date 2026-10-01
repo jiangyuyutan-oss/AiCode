@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +26,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import com.aicode.core.ui.AppSwitch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,6 +54,7 @@ import compose.icons.feathericons.Github
 import compose.icons.feathericons.Globe
 import compose.icons.feathericons.RefreshCw
 import compose.icons.feathericons.Tag
+import compose.icons.feathericons.Type
 
 /**
  * 关于页：顶部应用信息、版本号（点击手动检查更新）、自动检查更新开关、更新通道、
@@ -68,6 +72,7 @@ internal fun AboutSection(
 ) {
     val context = LocalContext.current
     var showChannelSheet by remember { mutableStateOf(false) }
+    var showFontLicenseDialog by remember { mutableStateOf(false) }
 
     // 通过 PackageManager 读取 versionName/versionCode（项目未开启 BuildConfig）
     val appInfo = remember {
@@ -160,6 +165,20 @@ internal fun AboutSection(
                 onClick = { openUrl(context, LICENSE_URL) }
             )
         }
+
+        SettingsGroup {
+            // HarmonyOS Sans 字体许可 prominent notice（许可证要求）
+            SettingsRow(
+                icon = FeatherIcons.Type,
+                title = stringResource(R.string.about_font_license),
+                subtitle = stringResource(R.string.about_font_license_desc),
+                onClick = { showFontLicenseDialog = true }
+            )
+        }
+    }
+
+    if (showFontLicenseDialog) {
+        FontLicenseDialog(onDismiss = { showFontLicenseDialog = false })
     }
 
     if (showChannelSheet) {
@@ -300,6 +319,43 @@ private fun UpdateChannelSheet(
     }
 }
 
+/**
+ * HarmonyOS Sans 字体许可对话（许可证要求 prominent notice）。
+ * 从 assets 读取随包分发、未修改的原始许可协议文本，供用户查阅。
+ */
+@Composable
+private fun FontLicenseDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val licenseText = remember {
+        runCatching {
+            context.assets.open(FONT_LICENSE_ASSET).bufferedReader().use { it.readText() }
+        }.getOrDefault("")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_close))
+            }
+        },
+        title = { Text(stringResource(R.string.about_font_license)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = licenseText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    )
+}
+
 /** GitHub tag 形如 v1.7.0 / 1.7.0 / v1.7.0-rc1，提取出纯版本号。 */
 internal fun parseVersionTag(tag: String): String? {
     val raw = tag.trim().removePrefix("v")
@@ -397,3 +453,4 @@ private fun loadAppIconBitmap(context: Context): ImageBitmap? {
 private const val GITHUB_REPO_URL = "https://github.com/jieapi/aicode"
 private const val LICENSE_URL = "https://github.com/jieapi/aicode/blob/main/LICENSE"
 private const val ICON_PX_DP = 48
+private const val FONT_LICENSE_ASSET = "fonts/HarmonyOS_Sans_LICENSE.txt"

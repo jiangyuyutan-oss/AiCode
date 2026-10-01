@@ -29,3 +29,4 @@
 
 - **GitHub 仓库**：用系统浏览器打开源码仓库。
 - **开源许可证**：本项目使用 GPL-3.0，点击打开完整的 LICENSE 文件。
+- **HarmonyOS Sans 字体**：界面使用的鸿蒙字体。点开后显示随包分发的完整许可协议（HarmonyOS Sans Fonts License Agreement），版权归华为终端有限公司。字体以未修改副本形式随应用分发。

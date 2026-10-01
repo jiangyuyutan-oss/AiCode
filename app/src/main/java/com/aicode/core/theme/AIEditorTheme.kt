@@ -17,10 +17,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aicode.R
 
 object Spacing {
     val xs = 4.dp
@@ -285,15 +287,18 @@ internal val LightColorScheme = lightColorScheme(
 )
 
 /**
- * 应用字体族接线点。
- *
- * 鸿蒙设计规范使用 HarmonyOS Sans。字体 `.ttf` 为受版权保护的二进制资产且需从华为官网
- * 授权页下载，仓库不内置；这里用 `FontFamily.SansSerif` 接线——在华为 / EMUI / HarmonyOS
- * 设备上系统无衬线字体即 HarmonyOS Sans（自动落到鸿蒙字面），其它设备回退 Roboto。
- * 后续若拿到授权字体文件放入 `res/font/`，把本 val 换成
- * `FontFamily(ResourceFont(R.font.harmonyos_sans, ...))` 即可全站生效。
+ * 应用字体族：Latin 用 HarmonyOS Sans 可变字体的 4 个实例化静态字重（Light/Regular/Medium/Bold），
+ * 总加载 ~620KB、UI 字重层级齐整。CJK 字符由系统字体链回退——HarmonyOS 设备命中原生
+ * HarmonyOS Sans SC、其它 Android 命中 Noto/Source Han，避免包体炸到 20MB+。
+ * 许可协议（HarmonyOS Sans Fonts License Agreement）内嵌 assets/fonts/HarmonyOS_Sans_LICENSE.txt。
  */
-val AppFontFamily: FontFamily = FontFamily.SansSerif
+val AppFontFamily: FontFamily = FontFamily(
+    Font(R.font.harmonyos_sans_light, FontWeight.Light),
+    Font(R.font.harmonyos_sans_regular, FontWeight.Normal),
+    Font(R.font.harmonyos_sans_medium, FontWeight.Medium),
+    Font(R.font.harmonyos_sans_semibold, FontWeight.SemiBold),
+    Font(R.font.harmonyos_sans_bold, FontWeight.Bold),
+)
 
 private val AppTypography = Typography().run {
     fun TextStyle.harmony(weight: FontWeight? = null, lh: Int? = null, ls: Int = 0) = copy(
